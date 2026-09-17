@@ -94,7 +94,7 @@ struct UnsupportedBC <: MatrixFreeOperators.AbstractBC end
         bf = BlockForest(base; blocksize=(4, 4), maxlevel=2)
         refine!(bf, x -> x[1] < 0.5 && x[2] < 0.5)     # one corner root → mixed levels
         @test !bf.forest.uniform[]
-        uf = set!(scalar_field(bf), x -> x[1]^2 + x[2]^2)   # Δu = 4 exactly
+        uf = set!(x -> x[1]^2 + x[2]^2, scalar_field(bf))   # Δu = 4 exactly
         Lu = laplacian(bf) * uf
         # Every stencil fed only by interior/interface ghosts must be exact; skip
         # the one-cell layer whose stencil reads a homogeneous physical-BC ghost.
@@ -118,19 +118,19 @@ struct UnsupportedBC <: MatrixFreeOperators.AbstractBC end
         bf = BlockForest(base; blocksize=(4, 4), maxlevel=2)
         uf = scalar_field(bf)
         refine!(bf, _ -> false)                         # no-op regrid keeps fields valid
-        @test set!(uf, x -> x[1]) isa BlockField
+        @test set!(x -> x[1], uf) isa BlockField
         refine!(bf, _ -> true)                          # uniform level 1: new leaf set
         @test_throws ArgumentError laplacian(bf) * uf
         @test_throws ArgumentError flatten(uf)
-        @test_throws ArgumentError set!(uf, x -> x[1])
+        @test_throws ArgumentError set!(x -> x[1], uf)
         # copies and similars of a stale field are equally stale
-        @test_throws ArgumentError set!(copy(uf), x -> x[1])
+        @test_throws ArgumentError set!(x -> x[1], copy(uf))
         uf2 = scalar_field(bf)                          # fresh allocation works
-        @test flatten(set!(uf2, x -> x[1])) isa Vector
+        @test flatten(set!(x -> x[1], uf2)) isa Vector
         # coarsening back to the original leaf count is still a different generation
         coarsen!(bf, _ -> true)
         @test MFO.nleaves(bf) == 4
-        @test_throws ArgumentError set!(uf, x -> x[1])
-        @test_throws ArgumentError set!(uf2, x -> x[1])
+        @test_throws ArgumentError set!(x -> x[1], uf)
+        @test_throws ArgumentError set!(x -> x[1], uf2)
     end
 end

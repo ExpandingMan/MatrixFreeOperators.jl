@@ -26,7 +26,7 @@ end
 @testset "guards" begin
     g = mdla_grid((Dirichlet(), Dirichlet()))
     gc = coarsen(g)
-    v = set!(vector_field(g), x -> SVector(1.0, 0.0))
+    v = set!(x -> SVector(1.0, 0.0), vector_field(g))
     @test_throws ArgumentError prepare_distributed(MatrixFreeOperators.gradient(g), 1)
     @test_throws ArgumentError prepare_distributed(MatrixFreeOperators.divergence(g), 1)
     @test_throws ArgumentError prepare_distributed(advection(g, v) + laplacian(g), 1)
@@ -35,13 +35,13 @@ end
     @test_throws ArgumentError prepare_distributed(laplacian(gc) * restriction(g, gc), 1)
     @test_throws ArgumentError prepare_distributed(laplacian(g), NGPUS_MDLA + 1)
     # a coefficient on some OTHER grid: each leaf is fine alone, only the tree shows it
-    κc = set!(scalar_field(gc), x -> 1 + x[1] / 7)
+    κc = set!(x -> 1 + x[1] / 7, scalar_field(gc))
     @test_throws ArgumentError prepare_distributed(laplacian(g) + scaling(κc), 1)
 end
 
 @testset "newly distributable operators are accepted" begin
     g = mdla_grid((Dirichlet(), Dirichlet()))
-    κ = set!(scalar_field(g), x -> 1 + x[1] / 7)
+    κ = set!(x -> 1 + x[1] / 7, scalar_field(g))
     for L in (
         laplacian(g) * laplacian(g),
         adjoint(derivative(g, 1)),
@@ -68,7 +68,7 @@ end
 # Cases with a *false* trait catch a forwarding that hard-codes `true`.
 @testset "traits forward to the global tree" begin
     g = mdla_grid((Dirichlet(), Neumann()))
-    κ = set!(scalar_field(g), x -> 1 + x[1] / 7)
+    κ = set!(x -> 1 + x[1] / 7, scalar_field(g))
     D1 = derivative(g, 1; order=1)
     for L in (
         laplacian(g),                                  # self-adjoint, not diagonal
@@ -351,7 +351,7 @@ end
         bc=((Dirichlet(), Dirichlet()), (Dirichlet(), Dirichlet())),
     )
     L = adjoint(derivative(g, 2)) * derivative(g, 2) + 1.0 * identity_op()
-    f = set!(scalar_field(g), x -> sin(π * x[1]) * sin(π * x[2]))
+    f = set!(x -> sin(π * x[1]) * sin(π * x[2]), scalar_field(g))
     bflat = flatten(f)
 
     u_cpu, stats_cpu = Krylov.cg(
@@ -376,7 +376,7 @@ end
 @testset "Krylov.cg on distributed Poisson" begin
     g = CartesianGrid(((0.0, 1.0), (0.0, 1.0)), (24, 26))
     L = -1.0 * laplacian(g)   # SPD under homogeneous Dirichlet
-    f = set!(scalar_field(g), x -> sin(π * x[1]) * sin(π * x[2]))
+    f = set!(x -> sin(π * x[1]) * sin(π * x[2]), scalar_field(g))
     bflat = flatten(f)
     n = length(bflat)
 
@@ -411,7 +411,7 @@ mdla_coeff(x) = 1.5 + x[2] + 0.3 * x[1] * x[2] + 0.2 * x[2]^2
 @testset "the coefficient is sliced and uploaded per partition" begin
     if NGPUS_MDLA >= 2
         g = mdla_grid((Dirichlet(), Neumann()))
-        κ = set!(scalar_field(g), mdla_coeff)
+        κ = set!(mdla_coeff, scalar_field(g))
         P = prepare_distributed(laplacian(g) * scaling(κ), 2)
         locals = partition_grid(g, 2)
         for d in 1:2
@@ -435,7 +435,7 @@ end
 @testset "the diffusion coefficient is uploaded with its cut-plane ghosts" begin
     if NGPUS_MDLA >= 2
         g = mdla_grid((Dirichlet(), Neumann()))
-        κ = set!(scalar_field(g), mdla_coeff)
+        κ = set!(mdla_coeff, scalar_field(g))
         Dg = diffusion(g, κ)
         P = prepare_distributed(laplacian(g) * Dg, 2)
         locals = partition_grid(g, 2)
@@ -465,7 +465,7 @@ end
             g = mdla_grid(cutbc)
             n = prod(local_size(g))
             xflat = rand(rng, n)
-            κ = set!(scalar_field(g), mdla_coeff)
+            κ = set!(mdla_coeff, scalar_field(g))
             for L in (
                 scaling(κ),
                 laplacian(g) * scaling(κ),
@@ -499,7 +499,7 @@ end
         rng = Random.MersenneTwister(67)
         g = mdla_grid((Dirichlet(), Neumann()))
         n = prod(local_size(g))
-        κ = set!(scalar_field(g), mdla_coeff)
+        κ = set!(mdla_coeff, scalar_field(g))
         x, y = rand(rng, n), rand(rng, n)
         for L in (
             scaling(κ) * laplacian(g),
@@ -523,7 +523,7 @@ end
         gs = CartesianGrid(((0.0, 1.0), (0.0, 1.0)), (3, 6);
             bc=((Dirichlet(), Dirichlet()), (Dirichlet(), Neumann())))
         ns = prod(local_size(gs))
-        κs = set!(scalar_field(gs), mdla_coeff)
+        κs = set!(mdla_coeff, scalar_field(gs))
         for Lt in (
             scaling(κs) * laplacian(gs),
             adjoint(derivative(gs, 1) * scaling(κs)),
@@ -550,7 +550,7 @@ end
             ((0.0, 2π), (0.0, 1.0)), (16, 18);
             bc=((Dirichlet(0.75), Neumann(-1.25)), cut),
         )
-        κ = set!(scalar_field(g), mdla_coeff)
+        κ = set!(mdla_coeff, scalar_field(g))
         D1 = derivative(g, 1)
         for L in (
             laplacian(g),
@@ -585,7 +585,7 @@ end
         ((0.0, 1.0), (0.0, 1.0)), (24, 26);
         bc=((Dirichlet(0.5), Dirichlet(-0.25)), (Dirichlet(1.0), Dirichlet(-0.5))),
     )
-    κ = set!(scalar_field(g), mdla_coeff)
+    κ = set!(mdla_coeff, scalar_field(g))
     fun = x -> sin(π * x[1]) * sin(π * x[2]) + 0.3x[2]
     # `-diffusion` is the compact-form counterpart of `-(scaling(κ)*laplacian)`:
     # SPD, so cg applies, and exactly symmetric rather than merely close — an
@@ -597,7 +597,7 @@ end
         -1.0 * diffusion(g, κ),
         -1.0 * diffusion(g, κ; averaging=HarmonicMean()),
     )
-        bflat = flatten(set!(scalar_field(g), fun)) .- flatten(boundary_rhs(L, g))
+        bflat = flatten(set!(fun, scalar_field(g))) .- flatten(boundary_rhs(L, g))
         u_cpu, stats_cpu = Krylov.cg(prepare(L), bflat; atol=1e-10, rtol=1e-10)
         @test stats_cpu.solved
 
@@ -628,11 +628,11 @@ end
         )
         L = laplacian(g)
         fun = x -> sin(3x[1]) * exp(-x[2]) + 0.25x[1] * x[2]
-        ref = flatten(set!(scalar_field(g), fun)) .- flatten(boundary_rhs(L, g))
+        ref = flatten(set!(fun, scalar_field(g))) .- flatten(boundary_rhs(L, g))
         P = prepare_distributed(L, 2)
         grids = local_grids(P)
         @test length(grids) == 2
-        fields = [set!(scalar_field(lg), fun) for lg in grids]
+        fields = [set!(fun, scalar_field(lg)) for lg in grids]
         @test gather(assemble_rhs(P, fields)) == ref
         @test_throws ArgumentError assemble_rhs(P, fields[1:1])
     else

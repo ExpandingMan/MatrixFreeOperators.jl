@@ -140,7 +140,7 @@ end
         n = length(flatten(scalar_field(bf)))
         v = rand(rng, n)
         wf = rand(rng, n)
-        D = diffusion(bf, set!(scalar_field(bf), x -> 1.2 + 0.8 * x[1]^2 + 0.5 * x[2]))
+        D = diffusion(bf, set!(x -> 1.2 + 0.8 * x[1]^2 + 0.5 * x[2], scalar_field(bf)))
 
         # The measurable form of "no additional halo exchange per application": one
         # exchange-rule invocation per apply, exactly the Laplacian's count — the
@@ -253,7 +253,7 @@ end
             bc=((Dirichlet(), Dirichlet()), (Neumann(), Neumann())),
         )
         w = rand(rng, local_size(g)...)
-        κ0 = set!(scalar_field(g), x -> 1 + x[1] * x[2])
+        κ0 = set!(x -> 1 + x[1] * x[2], scalar_field(g))
 
         @testset "$(name)" for (name, L) in (
             ("Laplacian", laplacian(g)),
@@ -291,7 +291,7 @@ end
             bc=((Dirichlet(), Dirichlet()), (Neumann(), Neumann())),
         )
         w = rand(rng, local_size(g)...)
-        u = set!(scalar_field(g), x -> sin(3 * x[1]) * x[2])
+        u = set!(x -> sin(3 * x[1]) * x[2], scalar_field(g))
         κ = 1.0 .+ rand(rng, padded_size(g)...)
         dκ = zero(κ)
         Enzyme.autodiff(

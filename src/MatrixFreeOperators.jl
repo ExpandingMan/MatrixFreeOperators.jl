@@ -15,6 +15,7 @@ export refine!, coarsen!, balance!, leaves, regrid!
 export Interpolated, Conservative, SlopeLimited, with_transfer
 export AbstractField, Field, Center, scalar_field, vector_field, set!, ncomponents, component
 export flatten, flat_to_interior!, interior_to_flat!
+export op!, compatible, check_compatible, check_layout, same_layout
 export AbstractOperator, apply, apply!, apply_adjoint!, AdjointOp
 export islinear, isconstant, isselfadjoint, isdiagonal, shares_exchange, operator_diagonal
 export Laplacian, laplacian, laplacian_stencil, laplacian_7pt_noflux

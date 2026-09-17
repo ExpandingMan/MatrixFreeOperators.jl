@@ -32,7 +32,7 @@ end
     )
     rng = Random.MersenneTwister(1907)
     w = rand(rng, local_size(g)...)
-    κ0 = set!(scalar_field(g), x -> 1 + x[1] * x[2])
+    κ0 = set!(x -> 1 + x[1] * x[2], scalar_field(g))
 
     @testset "field gradient matches the declared adjoint: $(name)" for (name, L) in (
         ("Laplacian", laplacian(g)),
@@ -67,7 +67,7 @@ end
     end
 
     @testset "parameter gradient w.r.t. the coefficient field κ" begin
-        u = set!(scalar_field(g), x -> sin(3 * x[1]) * x[2])
+        u = set!(x -> sin(3 * x[1]) * x[2], scalar_field(g))
         κ = 1.0 .+ rand(rng, padded_size(g)...)
         dκ = DI.gradient(
             di_kappa_loss,

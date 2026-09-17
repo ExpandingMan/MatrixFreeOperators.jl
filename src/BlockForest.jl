@@ -136,6 +136,41 @@ Leaf grids are all-[`Interface`](@ref); physical BCs live on `bf.bc`.
 """
 leaves(bf::BlockForest) = ((key, leaf_grid(bf, key)) for key in bf.forest.leaves)
 
+@inline function _grid_mismatch(a::BlockForest{N}, b::BlockForest{N}) where {N}
+    a === b && return nothing
+    a.blocksize == b.blocksize || return :blocksize
+    a.halo == b.halo || return :halo
+    a.spacing0 == b.spacing0 || return :spacing0
+    a.extent == b.extent || return :extent
+    a.bc === b.bc || return :bc
+    return _forest_mismatch(a.forest, b.forest)
+end
+
+# Forest topology. `===` covers every Adapt twin (they share one `Forest`), so the
+# O(nleaves) leaf compare is reached only for two independently built forests.
+# `maxlevel` is compared even though equal leaf sets would sort identically under a
+# different `maxlevel`: a field's future regrids depend on it, and "same forest"
+# should mean the same forest going forward, not just today.
+function _forest_mismatch(a::Forest{N}, b::Forest{N}) where {N}
+    a === b && return nothing
+    a.nroot == b.nroot || return :nroot
+    a.periodic == b.periodic || return :periodic
+    a.maxlevel == b.maxlevel || return :maxlevel
+    a.leaves == b.leaves || return :leaves
+    return nothing
+end
+
+# Same block shape and the same number of blocks: block `i` of one field can be
+# broadcast against block `i` of the other. Whether block `i` covers the same
+# region in both forests is a *grid* question, not a layout one.
+@inline function _layout_mismatch(a::BlockForest{N}, b::BlockForest{N}) where {N}
+    a === b && return nothing
+    a.blocksize == b.blocksize || return :blocksize
+    a.halo == b.halo || return :halo
+    nleaves(a) == nleaves(b) || return :nleaves
+    return nothing
+end
+
 #--------------------------------------------------------------------------------# Adaptivity
 
 """

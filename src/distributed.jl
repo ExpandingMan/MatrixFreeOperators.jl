@@ -734,7 +734,7 @@ end
 # right-hand side independent of the partition count.
 function _dist_set!(fields, fun::F, ctx) where {F}
     _dist_map!(ctx) do p
-        set!(fields[p], fun)
+        set!(fun, fields[p])
     end
     return fields
 end

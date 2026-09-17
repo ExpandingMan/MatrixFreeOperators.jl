@@ -33,7 +33,7 @@ println("laplacian mul! — CPU per-leaf / GPU per-leaf / GPU packed (min time)"
     "forest", "nleaves", "DOFs", "CPU/leaf", "GPU/leaf", "GPU packed", "packed speedup", "host alloc")
 for (n, refined) in ((256, false), (512, false), (1024, false), (2048, false), (512, true))
     bf = make_forest(n; refined)
-    u = set!(scalar_field(bf), x -> sin(4x[1]) + cos(3x[2]))
+    u = set!(x -> sin(4x[1]) + cos(3x[2]), scalar_field(bf))
     L = laplacian(bf)
     x = flatten(u)
     y = similar(x)
@@ -70,7 +70,7 @@ println("\nhalo_update! on the device packed field — batched kernels vs per-de
     "forest", "nleaves", "kernels", "loop", "kernel speedup")
 for (n, refined) in ((512, false), (2048, false), (512, true))
     bf = make_forest(n; refined)
-    u = set!(scalar_field(bf), x -> sin(4x[1]) + cos(3x[2]))
+    u = set!(x -> sin(4x[1]) + cos(3x[2]), scalar_field(bf))
     pg = Adapt.adapt(CuArray, pack(u))
     sched = MFO._exchange_schedule(bf)
     halo_update!(pg, pg.grid)                        # warm the _device_schedule cache

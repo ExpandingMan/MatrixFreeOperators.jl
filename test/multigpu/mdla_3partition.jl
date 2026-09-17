@@ -138,7 +138,7 @@ mp_grid(cutbc) = CartesianGrid(
         @testset "3-partition Krylov.cg parity" begin
             g = CartesianGrid(((0.0, 1.0), (0.0, 1.0)), (24, 26))
             L = -1.0 * laplacian(g)   # SPD under homogeneous Dirichlet
-            f = set!(scalar_field(g), x -> sin(π * x[1]) * sin(π * x[2]))
+            f = set!(x -> sin(π * x[1]) * sin(π * x[2]), scalar_field(g))
             bflat = flatten(f)
             n = length(bflat)
 
@@ -164,7 +164,7 @@ mp_grid(cutbc) = CartesianGrid(
                 g = mp_grid(cutbc)
                 n = prod(local_size(g))
                 xflat = rand(rng, n)
-                κ = set!(scalar_field(g), mp_coeff)
+                κ = set!(mp_coeff, scalar_field(g))
                 for L in (
                     scaling(κ),
                     laplacian(g) * scaling(κ),
@@ -188,7 +188,7 @@ mp_grid(cutbc) = CartesianGrid(
             for cutbc in ((Dirichlet(), Neumann()), (Periodic(), Periodic()))
                 g = mp_grid(cutbc)
                 n = prod(local_size(g))
-                κ = set!(scalar_field(g), mp_coeff)
+                κ = set!(mp_coeff, scalar_field(g))
                 for L in (scaling(κ) * laplacian(g), laplacian(g) * scaling(κ))
                     P = prepare_distributed(L, 3)
                     x = MultiDeviceVector(rand(rng, n), P.spec)
@@ -211,7 +211,7 @@ mp_grid(cutbc) = CartesianGrid(
                     ((0.0, 2π), (0.0, 1.0)), (16, 18);
                     bc=((Dirichlet(0.75), Neumann(-1.25)), cut),
                 )
-                κ = set!(scalar_field(g), mp_coeff)
+                κ = set!(mp_coeff, scalar_field(g))
                 D1 = derivative(g, 1)
                 for L in (
                     laplacian(g),
@@ -233,7 +233,7 @@ mp_grid(cutbc) = CartesianGrid(
             )
             L = -1.0 * laplacian(g)
             fun = x -> sin(3x[1]) * exp(-x[2]) + 0.25x[1] * x[2]
-            bflat = flatten(set!(scalar_field(g), fun)) .- flatten(boundary_rhs(L, g))
+            bflat = flatten(set!(fun, scalar_field(g))) .- flatten(boundary_rhs(L, g))
             u_cpu, stats_cpu = Krylov.cg(prepare(L), bflat; atol=1e-10, rtol=1e-10)
             @test stats_cpu.solved
 
@@ -258,7 +258,7 @@ mp_grid(cutbc) = CartesianGrid(
         @testset "3-partition diffusion coefficient upload" begin
             for cutbc in ((Dirichlet(), Neumann()), (Periodic(), Periodic()))
                 g = mp_grid(cutbc)
-                κ = set!(scalar_field(g), mp_coeff)
+                κ = set!(mp_coeff, scalar_field(g))
                 Dg = diffusion(g, κ)
                 P = prepare_distributed(laplacian(g) * Dg, 3)
                 locals = partition_grid(g, 3)
@@ -282,7 +282,7 @@ mp_grid(cutbc) = CartesianGrid(
                 g = mp_grid(cutbc)
                 n = prod(local_size(g))
                 xflat = rand(rng, n)
-                κ = set!(scalar_field(g), mp_coeff)
+                κ = set!(mp_coeff, scalar_field(g))
                 for L in (
                     diffusion(g, κ),
                     diffusion(g, κ; averaging=HarmonicMean()),
@@ -306,7 +306,7 @@ mp_grid(cutbc) = CartesianGrid(
             for cutbc in ((Dirichlet(), Neumann()), (Periodic(), Periodic()))
                 g = mp_grid(cutbc)
                 n = prod(local_size(g))
-                κ = set!(scalar_field(g), mp_coeff)
+                κ = set!(mp_coeff, scalar_field(g))
                 for L in (diffusion(g, κ), laplacian(g) * diffusion(g, κ))
                     P = prepare_distributed(L, 3)
                     x = MultiDeviceVector(rand(rng, n), P.spec)

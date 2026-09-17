@@ -84,6 +84,8 @@ function _validate_bc(bc::Tuple, ::Val{N}) where {N}
     return nothing
 end
 
+AbstractGrid(g::AbstractGrid) = g
+
 #--------------------------------------------------------------------------------# Grid interface
 
 """
@@ -205,9 +207,124 @@ call this before any stencil that reads neighbor cells.
 """
 halo_update!(x, ::AbstractGrid) = x
 
+nleaves(::CartesianGrid) = 1
+function leaf_grid(g::CartesianGrid, j::Integer)
+    j == 1 || throw(ArgumentError("CartesianGrid only has a single leaf"))
+    g
+end
+
 function Adapt.adapt_structure(to, g::CartesianGrid{N}) where {N}
     device = KernelAbstractions.get_backend(Adapt.adapt(to, similar(Vector{Bool}, 0)))
     return CartesianGrid{N,eltype(g.spacing),typeof(g.bc),typeof(device),typeof(g.topology)}(
         g.extent, g.spacing, g.size, g.halo, g.bc, device, g.local_range, g.topology
     )
 end
+
+
+@inline function _grid_mismatch(a::CartesianGrid{N}, b::CartesianGrid{N}) where {N}
+    a === b && return nothing
+    a.size == b.size || return :size
+    a.halo == b.halo || return :halo
+    a.spacing == b.spacing || return :spacing
+    a.extent == b.extent || return :extent
+    a.bc === b.bc || return :bc
+    a.local_range == b.local_range || return :local_range
+    a.topology === b.topology || return :topology
+    return nothing
+end
+
+# Different grid types, or the same type in different dimensions: never compatible.
+_grid_mismatch(::AbstractGrid, ::AbstractGrid) = :type
+
+@inline function _layout_mismatch(a::CartesianGrid{N}, b::CartesianGrid{N}) where {N}
+    a === b && return nothing
+    a.size == b.size || return :size
+    a.halo == b.halo || return :halo
+    return nothing
+end
+
+_layout_mismatch(::AbstractGrid, ::AbstractGrid) = :type
+
+"""
+    a::AbstractGrid == b::AbstractGrid -> Bool
+
+Whether `a` and `b` describe the same discretization: equal cell counts, halo,
+spacing, extent, boundary conditions, ownership (`local_range`) and distributed
+topology for [`CartesianGrid`](@ref)s; equal block size, halo, root spacing,
+extent, physical boundary conditions and forest topology (root tiling,
+periodicity, `maxlevel`, leaf set) for [`BlockForest`](@ref)s. Grids of
+different types or dimensions are never equal. The `device` is deliberately
+**not** compared: a host grid and its `Adapt`-ed twin are the same
+discretization.
+
+`a === b` short-circuits, so the common case — two fields allocated from one
+grid object — costs a single comparison. `hash` is not specialized to match, so
+grids that are `==` but distinct objects are not interchangeable `Dict` keys.
+
+See also: [`same_layout`](@ref), [`check_compatible`](@ref).
+"""
+Base.:(==)(a::AbstractGrid, b::AbstractGrid) = isnothing(_grid_mismatch(a, b))
+
+@inline function _check_pair(what, a, b, level::String)
+    what === nothing || _throw_incompatible(what, a, b, level)
+    return nothing
+end
+
+# Grid-level twins of the field checks; documented with them in Fields.jl.
+# Tuple recursion, not `foreach` + closure — see the note there.
+@inline check_compatible(::AbstractGrid) = nothing
+@inline function check_compatible(a::AbstractGrid, b::AbstractGrid, rest::AbstractGrid...)
+    _check_pair(_grid_mismatch(a, b), a, b, "grid")
+    return check_compatible(a, rest...)
+end
+@inline check_layout(::AbstractGrid) = nothing
+@inline function check_layout(a::AbstractGrid, b::AbstractGrid, rest::AbstractGrid...)
+    _check_pair(_layout_mismatch(a, b), a, b, "layout")
+    return check_layout(a, rest...)
+end
+
+"""
+    same_layout(a::AbstractGrid, b::AbstractGrid) -> Bool
+
+Whether fields on `a` and `b` have the same padded storage shape, so that a
+pointwise broadcast between them (block by block for forests) is legal. Weaker
+than grid `==`: says nothing about geometry or boundary conditions.
+The right check for kernels that only ever combine values cell by cell.
+
+See also: [`check_layout`](@ref), [`check_compatible`](@ref).
+"""
+same_layout(a::AbstractGrid, b::AbstractGrid) = isnothing(_layout_mismatch(a, b))
+
+
+# Why each property matters, for an error that names the consequence rather than
+# just the field name.
+const _MISMATCH_REASONS = Dict{Symbol,String}(
+    :type => "they are different grid types or dimensions",
+    :size => "their interior cell counts differ, so the padded arrays cannot be broadcast together",
+    :halo => "their ghost-layer widths differ, so the same padded index means different cells",
+    :spacing => "their cell spacings differ",
+    :extent => "they cover different physical domains",
+    :bc => "their boundary conditions differ, so ghost cells would mean different things",
+    :local_range => "they own different global index ranges (a slab vs. the grid it was cut from?)",
+    :topology => "they belong to different distributed topologies",
+    :blocksize => "their block sizes differ",
+    :spacing0 => "their root-level spacings differ",
+    :nroot => "their root tilings differ",
+    :periodic => "their periodicity differs",
+    :maxlevel => "their maximum refinement levels differ",
+    :leaves => "their leaf sets differ (same domain, different refinement)",
+    :nleaves => "they have different numbers of leaf blocks",
+    :stale => "a forest field was allocated before its forest was regridded; allocate a fresh field on the current forest",
+)
+
+@noinline function _throw_incompatible(what::Symbol, a, b, level::String)
+    reason = get(_MISMATCH_REASONS, what, "they differ in $what")
+    throw(
+        ArgumentError(
+            "incompatible $level: $reason. Got " *
+            "$(summary(AbstractGrid(a))) vs $(summary(AbstractGrid(b))) [$what]",
+        ),
+    )
+end
+
+

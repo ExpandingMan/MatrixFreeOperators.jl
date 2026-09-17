@@ -156,7 +156,7 @@ remaining layout mismatch degrades to the per-leaf reference sweep.
 ### Examples
 
 ```julia
-u  = set!(scalar_field(bf), x -> sin(π * x[1]))
+u  = set!(x -> sin(π * x[1]), scalar_field(bf))
 P  = prepare(laplacian(bf), pack(u))
 ```
 

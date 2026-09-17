@@ -67,13 +67,13 @@ _grid_1d(n) = CartesianGrid(((0.0, 2π),), (n,); bc=((Periodic(), Periodic()),))
 
 function build_1d_leaf(n)
     g = _grid_1d(n)
-    u = set!(scalar_field(g), x -> sin(x[1]))
+    u = set!(x -> sin(x[1]), scalar_field(g))
     return similar(u), laplacian(g), u
 end
 
 function build_1d_added(n)
     g = _grid_1d(n)
-    u = set!(scalar_field(g), x -> sin(x[1]))
+    u = set!(x -> sin(x[1]), scalar_field(g))
     A = laplacian(g) + 2.0 * derivative(g, 1; order=1)          # Added(leaf, Scaled)
     return similar(u), A, u
 end
@@ -84,7 +84,7 @@ function build_2d(s::Int, prepared::Bool)
         ((0.0, 1.0), (0.0, 1.0)), (8s, 6s);
         bc=((Dirichlet(), Dirichlet()), (Periodic(), Periodic())),
     )
-    κ = set!(scalar_field(g), x -> 1 + x[1])
+    κ = set!(x -> 1 + x[1], scalar_field(g))
     K = divergence(g) * scaling(κ) * MatrixFreeOperators.gradient(g)
     u = scalar_field(g)
     interior(u) .= rand(Random.MersenneTwister(87 + s), local_size(g)...)
@@ -100,7 +100,7 @@ function build_3d_prepared(s::Int)
         ((0.0f0, 1.0f0), (0.0f0, 2.0f0), (0.0f0, 1.0f0)), (6s, 5s, 4s);
         bc=((Dirichlet(), Dirichlet()), (Periodic(), Periodic()), (Neumann(), Neumann())),
     )
-    κ = set!(scalar_field(g), x -> 1.0f0 + x[1] * x[3])
+    κ = set!(x -> 1.0f0 + x[1] * x[3], scalar_field(g))
     K = divergence(g) * scaling(κ) * MatrixFreeOperators.gradient(g) + 0.5f0 * laplacian(g)
     u = scalar_field(g)
     interior(u) .= rand(Random.MersenneTwister(87 + s), Float32, local_size(g)...)
@@ -114,7 +114,7 @@ function forest_step_alloc(n::Int, bs::Int)
     bc = ((Dirichlet(), Dirichlet()), (Neumann(), Neumann()))
     g = CartesianGrid(((0.0, 1.0), (0.0, 1.0)), (n, n); bc=bc)
     bf = BlockForest(g; blocksize=(bs, bs), maxlevel=2)
-    uf = set!(scalar_field(bf), x -> sinpi(x[1]) * cospi(2x[2]) + 0.3 * x[1])
+    uf = set!(x -> sinpi(x[1]) * cospi(2x[2]) + 0.3 * x[1], scalar_field(bf))
     Sf = laplacian(bf) + adjoint(derivative(bf, 1; order=1))
     P = prepare(Sf)
     up = pack(uf)
@@ -130,13 +130,13 @@ end
         L = laplacian(g)
         f!(du, u) = apply!(du, L, u)
 
-        u = set!(scalar_field(g), x -> sin(x[1]))
+        u = set!(x -> sin(x[1]), scalar_field(g))
         dt = 0.005
         nsteps = 200
         rk4_field!(f!, u, dt, nsteps)
 
         t = dt * nsteps
-        uref = exp(-t) .* interior(set!(scalar_field(g), x -> sin(x[1])))
+        uref = exp(-t) .* interior(set!(x -> sin(x[1]), scalar_field(g)))
         err = maximum(abs, interior(u) .- uref)
         @info "field-level RK4 heat equation" t err
         @test err < 1e-3
@@ -160,7 +160,7 @@ end
         @test any(!iszero, interior(b))
         dt = 0.4 * spacing(g)[1]^2
         nsteps = 4000                                 # t = 6.25 ≫ 1/π², fully relaxed
-        exact = interior(set!(scalar_field(g), x -> 1 + x[1]))
+        exact = interior(set!(x -> 1 + x[1], scalar_field(g)))
 
         u = scalar_field(g)
         du = similar(u)
@@ -197,7 +197,7 @@ end
             ((0.0, 1.0), (0.0, 1.0)), (8, 6);
             bc=((Dirichlet(), Dirichlet()), (Periodic(), Periodic())),
         )
-        κ = set!(scalar_field(g), x -> 1 + x[1])
+        κ = set!(x -> 1 + x[1], scalar_field(g))
         K = divergence(g) * scaling(κ) * MatrixFreeOperators.gradient(g)   # Composed
         P = prepare(K, scalar_field(g))
 
@@ -240,7 +240,7 @@ end
             ((0.0f0, 1.0f0), (0.0f0, 2.0f0), (0.0f0, 1.0f0)), (6, 5, 4);
             bc=((Dirichlet(), Dirichlet()), (Periodic(), Periodic()), (Neumann(), Neumann())),
         )
-        κ3 = set!(scalar_field(g3), x -> 1.0f0 + x[1] * x[3])
+        κ3 = set!(x -> 1.0f0 + x[1] * x[3], scalar_field(g3))
         K3 = divergence(g3) * scaling(κ3) * MatrixFreeOperators.gradient(g3) + 0.5f0 * laplacian(g3)
         P3 = prepare(K3, scalar_field(g3))
         u3 = scalar_field(g3)
@@ -276,7 +276,7 @@ end
         bc = ((Dirichlet(), Dirichlet()), (Neumann(), Neumann()))
         g = CartesianGrid(((0.0, 1.0), (0.0, 1.0)), (16, 16); bc=bc)
         bf = BlockForest(g; blocksize=(4, 4), maxlevel=2)
-        uf = set!(scalar_field(bf), x -> sinpi(x[1]) * cospi(2x[2]) + 0.3 * x[1])
+        uf = set!(x -> sinpi(x[1]) * cospi(2x[2]) + 0.3 * x[1], scalar_field(bf))
         Df = derivative(bf, 1; order=1)
         Sf = laplacian(bf) + adjoint(Df)           # Added(leaf, PreparedAdjoint) after prepare
         P = prepare(Sf)
@@ -341,7 +341,7 @@ end
             bc=((Neumann(), Neumann()), (Neumann(), Neumann())),
         )
         P = prepare(laplacian(gd))
-        u = set!(scalar_field(gd), x -> x[1] + x[2]^2)
+        u = set!(x -> x[1] + x[2]^2, scalar_field(gd))
         du = similar(u)
         @test apply!(du, P, u) === du
 
@@ -372,9 +372,9 @@ end
         bf = BlockForest(g; blocksize=(4, 4), maxlevel=1)
         bf2 = BlockForest(g; blocksize=(4, 4), maxlevel=1)
         Pf = prepare(laplacian(bf))
-        uf = set!(scalar_field(bf), x -> x[1])
+        uf = set!(x -> x[1], scalar_field(bf))
         @test apply!(similar(uf), Pf, uf) isa BlockField
-        uf2 = set!(scalar_field(bf2), x -> x[1])
+        uf2 = set!(x -> x[1], scalar_field(bf2))
         @test_throws ArgumentError apply!(similar(uf2), Pf, uf2)
         @test_throws ArgumentError apply!(similar(uf2), Pf, uf)
     end
@@ -384,13 +384,13 @@ end
         P = prepare(laplacian(g))
         f!(du, u) = mul!(du, P, u)
 
-        u = flatten(set!(scalar_field(g), x -> sin(x[1])))
+        u = flatten(set!(x -> sin(x[1]), scalar_field(g)))
         dt = 0.005
         nsteps = 200
         rk4!(f!, u, dt, nsteps)
 
         t = dt * nsteps
-        uref = exp(-t) .* flatten(set!(scalar_field(g), x -> sin(x[1])))
+        uref = exp(-t) .* flatten(set!(x -> sin(x[1]), scalar_field(g)))
         @test maximum(abs, u .- uref) < 1e-3
     end
 end

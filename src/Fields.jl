@@ -108,6 +108,8 @@ struct Field{L,A<:AbstractArray,G<:AbstractGrid} <: AbstractField
 end
 Field(data::AbstractArray, grid::AbstractGrid) = Field{Center}(data, grid)
 
+AbstractGrid(ϕ::AbstractField) = ϕ.grid
+
 """
     scalar_field(g::AbstractGrid, T=eltype(spacing(g))) -> Field
 
@@ -160,21 +162,72 @@ View of the interior (owned, non-halo) cells of the field.
 interior(f::Field) = view(f.data, interior(f.grid))
 
 """
-    set!(f::Field, fun) -> f
+    set!(fun, ϕ::AbstractField) -> ϕ
 
-Set the interior of `f` to `fun(x)` evaluated at cell centers, where `x` is the
-`SVector` of physical coordinates.
+Set the interior of `ϕ` to `fun(x)` evaluated at cell centers, where `x` is the
+`SVector` of physical coordinates. Ghost cells are left untouched. On a forest
+field the sweep runs block by block, so `ϕ` must be current with its forest
+(see [`regrid!`](@ref)).
+
+`fun` runs on the field's device, so it must be device-compatible: plain
+arithmetic on the coordinate `SVector`, with no captured host arrays. The
+function comes first so the `do`-block form reads naturally.
 
 ### Examples
 
 ```julia
 g = CartesianGrid(((0.0, 2π),), (64,))
-u = set!(scalar_field(g), x -> sin(x[1]))
+u = set!(x -> sin(x[1]), scalar_field(g))
+v = set!(scalar_field(g)) do x
+    exp(-x[1]^2)
+end
 ```
+
+See also: [`op!`](@ref), [`cell_center`](@ref).
 """
-function set!(f::Field, fun::F) where {F}
-    interior(f) .= fun.(cell_center.(Ref(f.grid), interior(f.grid)))
-    return f
+function set!(f::F, ϕ::Field) where {F}
+    g = AbstractGrid(ϕ)
+    map!(interior(ϕ), interior(g)) do idx
+        x = cell_center(g, idx)
+        f(x)
+    end
+    return ϕ
+end
+
+"""
+    op!(fun, ϕ::AbstractField, ϕs::AbstractField...; check=true) -> ϕ
+
+Pointwise update in place: set every interior cell of `ϕ` to
+`fun(x, ϕ[I], ϕs[1][I], ϕs[2][I], …)`, where `x` is the `SVector` of the cell's
+physical coordinates and the remaining arguments are the current values of `ϕ`
+and of each field in `ϕs` at that cell. Ghost cells are left untouched. Like
+[`set!`](@ref), `fun` runs on the device and the function comes first so the
+`do`-block form reads naturally.
+
+With `check=true` (the default) every field is first verified to live on the
+same grid as `ϕ` via [`check_compatible`](@ref); pass `check=false` only from a
+caller that has already checked. On forest fields the check runs once on the
+whole forest and the sweep then runs block by block.
+
+### Examples
+
+```julia
+g = CartesianGrid(((0.0, 1.0),), (64,))
+u = set!(x -> sin(x[1]), scalar_field(g))
+v = set!(x -> cos(x[1]), scalar_field(g))
+op!((x, a, b) -> a + x[1] * b, u, v)     # u ← u + x⋅v, cell by cell
+```
+
+See also: [`set!`](@ref), [`compatible`](@ref).
+"""
+function op!(f::F, ϕ::Field, ϕs::Field...; check::Bool=true) where {F}
+    check && check_compatible(ϕ, ϕs...)
+    g = AbstractGrid(ϕ)
+    map!(interior(ϕ), interior(g), interior(ϕ), map(interior, ϕs)...) do idx, a, b...
+        x = cell_center(g, idx)
+        f(x, a, b...)
+    end
+    return ϕ
 end
 
 """
@@ -285,3 +338,86 @@ function interior_to_flat!(v::AbstractVector, f::Field, α::Number=true, β::Num
     end
     return v
 end
+
+block(ϕ::Field, ::Integer, lg=ϕ.grid) = ϕ
+_block_array(ϕ::Field, ::Integer) = ϕ.data
+_require_current(::Field) = nothing
+
+# A `Field` is exactly as compatible as its grid.
+@inline _field_mismatch(a::Field, b::Field) = _grid_mismatch(a.grid, b.grid)
+@inline _field_layout_mismatch(a::Field, b::Field) = _layout_mismatch(a.grid, b.grid)
+
+# `Field` vs. forest field, or two forest fields of different storage layout
+# (`BlockField` vs. `PackedBlockField`): the per-block sweep can still pair them
+# through `_block_array`, so layout is *not* refused on the field type — only the
+# grid decides.  (Change these to `:type` if a function needs identical storage.)
+_field_mismatch(::AbstractField, ::AbstractField) = :type
+_field_layout_mismatch(::AbstractField, ::AbstractField) = :type
+
+"""
+    compatible(a::AbstractField, b::AbstractField...) -> Bool
+
+Whether every field lives on a grid `==` to `a`'s grid. Forest fields must
+also be current — allocated on the forest's present leaf set (see
+[`regrid!`](@ref)); a stale field is never compatible with anything.
+
+### Examples
+
+```julia
+g = CartesianGrid(((0.0, 1.0),), (64,))
+u = scalar_field(g); v = scalar_field(g)
+compatible(u, v)                       # true — same grid object, one `===`
+compatible(u, scalar_field(coarsen(g)))  # false
+```
+
+See also: [`check_compatible`](@ref), [`same_layout`](@ref).
+"""
+@inline compatible(::AbstractField) = true
+@inline compatible(a::AbstractField, b::AbstractField, rest::AbstractField...) =
+    isnothing(_field_mismatch(a, b)) && compatible(a, rest...)
+
+"""
+    check_compatible(a::AbstractField, b::AbstractField...) -> nothing
+    check_compatible(a::AbstractGrid, b::AbstractGrid...) -> nothing
+
+Throw an `ArgumentError` naming the first property on which any argument differs
+from `a` (grid `==`, plus regrid currency for forest fields).
+Return `nothing` otherwise. The guard for a multi-field function:
+
+```julia
+function fma!(y::AbstractField, α, x::AbstractField, z::AbstractField)
+    check_compatible(y, x, z)
+    ...
+end
+```
+
+The identity fast path makes this free when all fields share one grid object;
+the throw is out of line, so the check inlines into the caller.
+
+See also: [`check_layout`](@ref), [`compatible`](@ref).
+"""
+# Recursion over the argument tuple rather than `foreach` with a closure: the
+# closure form allocates ~1 KB per call from three fields up under
+# `--check-bounds=yes`; the recursive form measures 0 B for Field and BlockField.
+@inline check_compatible(::AbstractField) = nothing
+@inline function check_compatible(a::AbstractField, b::AbstractField, rest::AbstractField...)
+    _check_pair(_field_mismatch(a, b), a, b, "grid")
+    return check_compatible(a, rest...)
+end
+
+"""
+    check_layout(a::AbstractField, b::AbstractField...) -> nothing
+    check_layout(a::AbstractGrid, b::AbstractGrid...) -> nothing
+
+The [`same_layout`](@ref) counterpart of [`check_compatible`](@ref): throw an
+`ArgumentError` unless every argument has `a`'s padded storage shape (and, for
+forest fields, is current). For pointwise kernels that never read spacing or
+boundary conditions.
+"""
+@inline check_layout(::AbstractField) = nothing
+@inline function check_layout(a::AbstractField, b::AbstractField, rest::AbstractField...)
+    _check_pair(_field_layout_mismatch(a, b), a, b, "layout")
+    return check_layout(a, rest...)
+end
+
+nleaves(ϕ::Field) = nleaves(AbstractGrid(ϕ))

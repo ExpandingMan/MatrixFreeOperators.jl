@@ -81,7 +81,7 @@
 
             @testset "$name: Diffusion, varying κ, $(nameof(typeof(avg)))" for avg in
                                                                                FOREST_DIFF_AVGS
-                κv = set!(scalar_field(bf), κ_varying)
+                κv = set!(κ_varying, scalar_field(bf))
                 y = diffusion(bf, κv; averaging=avg) * u
                 defect, scale = conservation_defect(y, bf)
                 @info "conservation Σ V·(Lu)" case = "$name varying-κ $(nameof(typeof(avg)))" defect scale
@@ -131,10 +131,10 @@
         for bc in PARITY_BCS, avg in FOREST_DIFF_AVGS
             g = CartesianGrid(((0.0, 1.0), (0.0, 1.0)), (8, 8); bc=bc)
             bf = BlockForest(g; blocksize=(4, 4), maxlevel=2)   # level 0 ⇒ same (8, 8)
-            Dg = diffusion(g, set!(scalar_field(g), κ_fun); averaging=avg)
-            Df = diffusion(bf, set!(scalar_field(bf), κ_fun); averaging=avg)
-            ref = collect(interior(Dg * set!(scalar_field(g), u_fun)))
-            rec = reconstruct(Df * set!(scalar_field(bf), u_fun), (8, 8))
+            Dg = diffusion(g, set!(κ_fun, scalar_field(g)); averaging=avg)
+            Df = diffusion(bf, set!(κ_fun, scalar_field(bf)); averaging=avg)
+            ref = collect(interior(Dg * set!(u_fun, scalar_field(g))))
+            rec = reconstruct(Df * set!(u_fun, scalar_field(bf)), (8, 8))
             @test rec == ref                                    # bit-identical
         end
     end
@@ -146,10 +146,10 @@
             bf = BlockForest(base; blocksize=(4, 4), maxlevel=3)
             refine!(bf, _ -> true)                              # uniform level 1 = 16×16
             @test all(k -> k.level == 1, bf.forest.leaves)
-            Dg = diffusion(g16, set!(scalar_field(g16), κ_fun))
-            Df = diffusion(bf, set!(scalar_field(bf), κ_fun))
-            ref = collect(interior(Dg * set!(scalar_field(g16), u_fun)))
-            rec = reconstruct(Df * set!(scalar_field(bf), u_fun), (16, 16))
+            Dg = diffusion(g16, set!(κ_fun, scalar_field(g16)))
+            Df = diffusion(bf, set!(κ_fun, scalar_field(bf)))
+            ref = collect(interior(Dg * set!(u_fun, scalar_field(g16))))
+            rec = reconstruct(Df * set!(u_fun, scalar_field(bf)), (16, 16))
             @test rec == ref
         end
     end
@@ -158,8 +158,8 @@
         bci = ((Dirichlet(2.0), Dirichlet(-1.0)), (Neumann(0.5), Dirichlet(3.0)))
         g = CartesianGrid(((0.0, 1.0), (0.0, 1.0)), (8, 8); bc=bci)
         bf = BlockForest(g; blocksize=(4, 4), maxlevel=2)
-        Dg = diffusion(g, set!(scalar_field(g), κ_fun))
-        Df = diffusion(bf, set!(scalar_field(bf), κ_fun))
+        Dg = diffusion(g, set!(κ_fun, scalar_field(g)))
+        Df = diffusion(bf, set!(κ_fun, scalar_field(bf)))
         bfor = boundary_rhs(Df, scalar_field(bf))
         @test bfor isa BlockField
         @test reconstruct(bfor, (8, 8)) == collect(interior(boundary_rhs(Dg, scalar_field(g))))
@@ -194,7 +194,7 @@
             avg in FOREST_DIFF_AVGS
 
             bf = small_refined(bc)
-            D = diffusion(bf, set!(scalar_field(bf), κ_fun); averaging=avg)
+            D = diffusion(bf, set!(κ_fun, scalar_field(bf)); averaging=avg)
             @test islinear(D) && isconstant(D) && !isdiagonal(D)
             @test !isselfadjoint(D)                  # CF coupling breaks the symmetry
             @test adjoint(D) isa AdjointOp           # must not fold to D
@@ -248,7 +248,7 @@
         bf = BlockForest(
             CartesianGrid(((0.0, 1.0), (0.0, 1.0)), (8, 8)); blocksize=(4, 4), maxlevel=2
         )
-        D = diffusion(bf, set!(scalar_field(bf), κ_fun))
+        D = diffusion(bf, set!(κ_fun, scalar_field(bf)))
         @test isselfadjoint(D)
         @test adjoint(D) === D
         A = materialize(prepare(D))
@@ -263,7 +263,7 @@
         # skipping them.
         rng = Random.MersenneTwister(47)
         bf = small_refined(((Dirichlet(), Dirichlet()), (Neumann(), Neumann())))
-        D = diffusion(bf, set!(scalar_field(bf), κ_fun))
+        D = diffusion(bf, set!(κ_fun, scalar_field(bf)))
         ȳ = block_rand!(scalar_field(bf), bf, rng)
         x̄ = scalar_field(bf)
         for i in 1:MFO.nleaves(bf)
@@ -289,7 +289,7 @@
         base = CartesianGrid(((0.0, 1.0), (0.0, 1.0)), (8, 8); bc=bci)
         bf = BlockForest(base; blocksize=(4, 4), maxlevel=2)
         refine!(bf, x -> x[1] < 0.5 && x[2] < 0.5)
-        D = diffusion(bf, set!(scalar_field(bf), κ_fun))
+        D = diffusion(bf, set!(κ_fun, scalar_field(bf)))
         rng = Random.MersenneTwister(53)
         u = block_rand!(scalar_field(bf), bf, rng)
 
@@ -335,7 +335,7 @@
         # the reflected point.
         κlin(x) = 0.7 + 2.0 * x[1] - 1.3 * x[2]
         bf = small_refined(((Dirichlet(), Dirichlet()), (Neumann(), Neumann())))
-        κx = MFO.fill_coefficient_ghosts!(copy(set!(scalar_field(bf), κlin)), bf)
+        κx = MFO.fill_coefficient_ghosts!(copy(set!(κlin, scalar_field(bf))), bf)
         n = bf.blocksize
         lo = ntuple(k -> bf.extent[k][1], 2)
         counts = Dict("mirror" => 0, "copy" => 0, "inject" => 0, "average" => 0)
@@ -380,7 +380,7 @@
     @testset "the operator reads its exchanged κ ghosts (negative control)" begin
         rng = Random.MersenneTwister(59)
         bf = small_refined(((Periodic(), Periodic()), (Periodic(), Periodic())))
-        D = diffusion(bf, set!(scalar_field(bf), κ_fun))
+        D = diffusion(bf, set!(κ_fun, scalar_field(bf)))
         u = block_rand!(scalar_field(bf), bf, rng)
         clean = D * copy(u)
         κz = copy(D.κ)
@@ -400,7 +400,7 @@
 
     @testset "mutating κ after construction is inert" begin
         bf = small_refined(((Dirichlet(), Dirichlet()), (Dirichlet(), Dirichlet())))
-        κ = set!(scalar_field(bf), κ_fun)
+        κ = set!(κ_fun, scalar_field(bf))
         D = diffusion(bf, κ)
         rng = Random.MersenneTwister(61)
         u = block_rand!(scalar_field(bf), bf, rng)
@@ -439,11 +439,11 @@
         @test diffusion(bf, κpm; check=false) isa Diffusion
 
         # operator_diagonal stays unavailable on forests, matching Laplacian
-        D = diffusion(bf, set!(scalar_field(bf), κ_fun))
+        D = diffusion(bf, set!(κ_fun, scalar_field(bf)))
         @test_throws ArgumentError operator_diagonal(D)
 
         # a regrid invalidates the operator through its κ generation stamp
-        κold = set!(scalar_field(bf), κ_fun)
+        κold = set!(κ_fun, scalar_field(bf))
         Dold = diffusion(bf, κold)
         nl0 = MFO.nleaves(bf)
         refine!(bf, x -> x[1] > 0.7 && x[2] > 0.7)   # matches the top-right leaf CENTER
@@ -478,7 +478,7 @@
             return a, sum(out)                          # DCE-proof: consume the output
         end
         function forest_alloc(bf, adj)
-            L = diffusion(bf, set!(scalar_field(bf), κ_fun))
+            L = diffusion(bf, set!(κ_fun, scalar_field(bf)))
             P = prepare(adj ? adjoint(L) : L)
             v = rand(Random.MersenneTwister(3), size(P, 2))
             a, s = alloc_mul(P, similar(v), v)
@@ -501,8 +501,8 @@
 
     @testset "packed coefficient path (prepared prototype packs κ)" begin
         bf = small_refined(((Dirichlet(), Dirichlet()), (Neumann(), Neumann())))
-        D = diffusion(bf, set!(scalar_field(bf), κ_fun))
-        uf = set!(scalar_field(bf), u_fun)
+        D = diffusion(bf, set!(κ_fun, scalar_field(bf)))
+        uf = set!(u_fun, scalar_field(bf))
         P = prepare(D, pack(uf))
         @test P.xpad isa PackedBlockField            # packed prototype ⇒ packed scratch
         @test P.op.κ isa PackedBlockField            # _prepare_tree packed the coefficient
@@ -531,8 +531,8 @@
             )
             bf = BlockForest(base; blocksize=(4, 4), maxlevel=2)
             refined && refine!(bf, x -> x[1] < 0.5)
-            uf = set!(scalar_field(bf), u_fun)
-            D = diffusion(bf, set!(scalar_field(bf), κ_fun); averaging=avg)
+            uf = set!(u_fun, scalar_field(bf))
+            D = diffusion(bf, set!(κ_fun, scalar_field(bf)); averaging=avg)
             Dp = MFO.Diffusion(bf, pack(D.κ), D.avg)  # inner ctor: ghosts ride pack
 
             # public packed path: packed κ on packed x hits the new override; a
@@ -579,7 +579,7 @@
             # direct adjoint launch: full padded equality pre-fold (the ghost
             # cotangents are the point of the padded ndrange)
             ndp = (bf.blocksize .+ 2 .* bf.halo..., MFO.nleaves(bf))
-            ȳ = pack(set!(scalar_field(bf), x -> cospi(x[1]) + x[2]^2))
+            ȳ = pack(set!(x -> cospi(x[1]) + x[2]^2, scalar_field(bf)))
             ȳk = copy(ȳ)
             ȳr = copy(ȳ)
             x̄k = MFO.allocate_input(Dp, ȳk)

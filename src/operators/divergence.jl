@@ -48,7 +48,7 @@ Variable-coefficient diffusion can be assembled as
 ```julia
 g = CartesianGrid(((0.0, 2π), (0.0, 2π)), (32, 32);
                   bc=((Periodic(), Periodic()), (Periodic(), Periodic())))
-v = set!(vector_field(g), x -> SVector(sin(x[1]), cos(x[2])))
+v = set!(x -> SVector(sin(x[1]), cos(x[2])), vector_field(g))
 divv = divergence(g) * v
 ```
 

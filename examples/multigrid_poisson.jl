@@ -16,8 +16,8 @@ A = prepare(L)
 uexact(x) = 1 + exp(x[1]) * sinpi(x[1]) * sinpi(x[2])
 f(x) = -exp(x[1]) * sinpi(x[2]) * ((1 - 2 * pi^2) * sinpi(x[1]) + 2 * pi * cospi(x[1]))
 # inhomogeneous boundary data enters the RHS through the affine lift
-b = flatten(set!(scalar_field(g), f)) .- flatten(boundary_rhs(L, g))
-uex = flatten(set!(scalar_field(g), uexact))
+b = flatten(set!(f, scalar_field(g))) .- flatten(boundary_rhs(L, g))
+uex = flatten(set!(uexact, scalar_field(g)))
 
 mg = MultigridPreconditioner(L)                          # Jacobi(2/3), levels=:auto
 println(mg)

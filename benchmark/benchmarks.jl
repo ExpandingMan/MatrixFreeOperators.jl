@@ -16,15 +16,15 @@ g3 = CartesianGrid(((0.0, 1.0), (0.0, 1.0), (0.0, 1.0)), (64, 64, 64))
 for (dim, g) in (("2D 256²", g2), ("3D 64³", g3))
     L = laplacian(g)
     P = prepare(L, scalar_field(g))
-    x = flatten(set!(scalar_field(g), p -> sin(4p[1]) + cos(3p[end])))
+    x = flatten(set!(p -> sin(4p[1]) + cos(3p[end]), scalar_field(g)))
     y = similar(x)
     SUITE["grid"][dim]["laplacian prepare"] = @benchmarkable prepare($L, $(scalar_field(g)))
     SUITE["grid"][dim]["laplacian mul!"] = @benchmarkable mul!($y, $P, $x)
 end
 
-xs2 = flatten(set!(scalar_field(g2), p -> sin(4p[1]) + cos(3p[2])))
+xs2 = flatten(set!(p -> sin(4p[1]) + cos(3p[2]), scalar_field(g2)))
 ys2 = similar(xs2)
-xv2 = flatten(set!(vector_field(g2), p -> SVector(sin(p[2]), cos(p[1]))))
+xv2 = flatten(set!(p -> SVector(sin(p[2]), cos(p[1])), vector_field(g2)))
 yv2 = similar(xv2)
 
 PG = prepare(gradient(g2), scalar_field(g2))
@@ -33,11 +33,11 @@ SUITE["grid"]["2D 256²"]["gradient mul!"] = @benchmarkable mul!($yv2, $PG, $xs2
 PD = prepare(divergence(g2), vector_field(g2))
 SUITE["grid"]["2D 256²"]["divergence mul!"] = @benchmarkable mul!($ys2, $PD, $xv2)
 
-vel = set!(vector_field(g2), p -> SVector(sin(p[2]), cos(p[1])))
+vel = set!(p -> SVector(sin(p[2]), cos(p[1])), vector_field(g2))
 PA = prepare(advection(g2, vel), scalar_field(g2))
 SUITE["grid"]["2D 256²"]["advection mul!"] = @benchmarkable mul!($ys2, $PA, $xs2)
 
-κ = set!(scalar_field(g2), p -> 1 + 0.5 * sin(p[1]))
+κ = set!(p -> 1 + 0.5 * sin(p[1]), scalar_field(g2))
 PS = prepare(2.0 * laplacian(g2) + scaling(κ), scalar_field(g2))
 SUITE["grid"]["2D 256²"]["2λ + κ·I mul!"] = @benchmarkable mul!($ys2, $PS, $xs2)
 
@@ -50,15 +50,15 @@ SUITE["grid"]["2D 256²"]["∇·(κ∇u) mul!"] = @benchmarkable mul!($ys2, $PK,
 # benchpkg runs this file on the PR's base branch too, where Diffusion does not exist.
 if isdefined(MatrixFreeOperators, :Diffusion)
     for (dim, g, xf, yf) in (("2D 256²", g2, xs2, ys2),)
-        D = diffusion(g, set!(scalar_field(g), p -> 1 + 0.5 * sin(p[1])))
+        D = diffusion(g, set!(p -> 1 + 0.5 * sin(p[1]), scalar_field(g)))
         PDf = prepare(D, scalar_field(g))
         SUITE["grid"][dim]["diffusion prepare"] = @benchmarkable prepare(
             $D, $(scalar_field(g))
         )
         SUITE["grid"][dim]["diffusion mul!"] = @benchmarkable mul!($yf, $PDf, $xf)
     end
-    D3 = diffusion(g3, set!(scalar_field(g3), p -> 1 + 0.5 * sin(p[1])))
-    x3 = flatten(set!(scalar_field(g3), p -> sin(4p[1]) + cos(3p[3])))
+    D3 = diffusion(g3, set!(p -> 1 + 0.5 * sin(p[1]), scalar_field(g3)))
+    x3 = flatten(set!(p -> sin(4p[1]) + cos(3p[3]), scalar_field(g3)))
     y3 = similar(x3)
     PD3 = prepare(D3, scalar_field(g3))
     SUITE["grid"]["3D 64³"]["diffusion mul!"] = @benchmarkable mul!($y3, $PD3, $x3)
@@ -73,10 +73,10 @@ end
 # revisions without the distributed seam have no `_slab_op`.
 if isdefined(MatrixFreeOperators, :Diffusion) && isdefined(MatrixFreeOperators, :_slab_op)
     for (dim, g) in (("2D 256²", g2), ("3D 64³", g3))
-        D = diffusion(g, set!(scalar_field(g), p -> 1 + 0.5 * sin(p[1])))
+        D = diffusion(g, set!(p -> 1 + 0.5 * sin(p[1]), scalar_field(g)))
         lg = partition_grid(g, 2)[1]
         Ds = MatrixFreeOperators._slab_op(D, lg)
-        ȳs = set!(scalar_field(lg), p -> sin(4p[1]) + cos(3p[end]))
+        ȳs = set!(p -> sin(4p[1]) + cos(3p[end]), scalar_field(lg))
         x̄s = scalar_field(lg)
         SUITE["grid"][dim]["diffusion slab apply!"] =
             @benchmarkable apply!($x̄s, $Ds, $ȳs, $lg, 1.0, 0.0)
@@ -102,8 +102,8 @@ end
 # rank-changers gather unconditionally; a Laplacian would shortcut to its forward
 # action on this all-physical grid and measure nothing.
 
-sadj = set!(scalar_field(g2), p -> sin(4p[1]) + cos(3p[2]))
-vadj = set!(vector_field(g2), p -> SVector(sin(p[2]), cos(p[1])))
+sadj = set!(p -> sin(4p[1]) + cos(3p[2]), scalar_field(g2))
+vadj = set!(p -> SVector(sin(p[2]), cos(p[1])), vector_field(g2))
 sadj_out = scalar_field(g2)
 vadj_out = vector_field(g2)
 Dx, Dy = derivative(g2, 1), derivative(g2, 2)
@@ -132,7 +132,7 @@ SUITE["grid"]["2D 256²"]["adjoint(∂x + ∂y) mul!"] = @benchmarkable mul!($ys
 # 8×8 root tiling of 32² blocks (64 uniform leaves) — same DOFs as the 2D grid above,
 # so the forest overhead (halo exchange + per-leaf dispatch) is directly comparable.
 bf = BlockForest(g2; blocksize=(32, 32), maxlevel=2)
-xb = set!(scalar_field(bf), p -> sin(4p[1]) + cos(3p[2]))
+xb = set!(p -> sin(4p[1]) + cos(3p[2]), scalar_field(bf))
 Lf = laplacian(bf)
 Pf = prepare(Lf, scalar_field(bf))
 xf = flatten(xb)
@@ -159,7 +159,7 @@ end
 # Same 32² blocks, so the extra cost over the uniform leg is coarse–fine work.
 bfr = BlockForest(g2; blocksize=(32, 32), maxlevel=2)
 refine!(bfr, p -> p[1] < 0.5)
-xbr = set!(scalar_field(bfr), p -> sin(4p[1]) + cos(3p[2]))
+xbr = set!(p -> sin(4p[1]) + cos(3p[2]), scalar_field(bfr))
 Lr = laplacian(bfr)
 
 SUITE["forest"]["2D refined"]["halo_update!"] = @benchmarkable halo_update!($xbr, $bfr)
@@ -184,7 +184,7 @@ SUITE["forest"]["2D refined"]["laplacian apply_adjoint!"] =
 g3r = CartesianGrid(((0.0, 1.0), (0.0, 1.0), (0.0, 1.0)), (32, 32, 32))
 bfr3 = BlockForest(g3r; blocksize=(8, 8, 8), maxlevel=2)
 refine!(bfr3, p -> p[1] < 0.5)
-xbr3 = set!(scalar_field(bfr3), p -> sin(4p[1]) + cos(3p[3]))
+xbr3 = set!(p -> sin(4p[1]) + cos(3p[3]), scalar_field(bfr3))
 
 SUITE["forest"]["3D refined"]["halo_update!"] = @benchmarkable halo_update!($xbr3, $bfr3)
 SUITE["forest"]["3D refined"]["halo_update_adjoint!"] =

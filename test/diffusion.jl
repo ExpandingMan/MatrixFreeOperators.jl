@@ -40,10 +40,10 @@ end
                 ((0.0, 1.0), (0.0, 1.0)), (n, n);
                 bc=((Periodic(), Periodic()), (Periodic(), Periodic())),
             )
-            y = diffusion(g, set!(scalar_field(g), κf); averaging=avg) *
-                set!(scalar_field(g), uf)
+            y = diffusion(g, set!(κf, scalar_field(g)); averaging=avg) *
+                set!(uf, scalar_field(g))
             return maximum(
-                abs, collect(interior(y)) .- collect(interior(set!(scalar_field(g), exactf)))
+                abs, collect(interior(y)) .- collect(interior(set!(exactf, scalar_field(g))))
             )
         end
         @testset "$(nameof(typeof(avg)))" for avg in DIFF_AVGS
@@ -57,8 +57,8 @@ end
     @testset "1-D and 3-D action" begin
         # κ(x) = 1 + x, u(x) = x²  ⇒  ∇·(κ∇u) = (κu')' = (2x + 2x²)' = 2 + 4x
         g1 = CartesianGrid(((0.0, 1.0),), (128,); bc=((Neumann(), Neumann()),))
-        y1 = diffusion(g1, set!(scalar_field(g1), x -> 1 + x[1])) *
-             set!(scalar_field(g1), x -> x[1]^2)
+        y1 = diffusion(g1, set!(x -> 1 + x[1], scalar_field(g1))) *
+             set!(x -> x[1]^2, scalar_field(g1))
         # Interior only: the wall rows carry the homogeneous-Neumann flux, not (κu')'.
         yi = collect(interior(y1))[2:(end - 1)]
         xi = [cell_center(g1, I)[1] for I in interior(g1)][2:(end - 1)]
@@ -71,7 +71,7 @@ end
         )
         κ3 = scalar_field(g3)
         interior(κ3) .= 2.0
-        u3 = set!(scalar_field(g3), x -> prod(sin, x))
+        u3 = set!(x -> prod(sin, x), scalar_field(g3))
         @test collect(interior(diffusion(g3, κ3) * u3)) ≈
             2 .* collect(interior(laplacian(g3) * u3))
     end
@@ -315,7 +315,7 @@ end
         # so ∂(Lu)_I/∂κ_I ≡ 0. The compact form includes κ_I. This local
         # sensitivity does not prove that the full κ-Jacobian has no null space.
         g = CartesianGrid(((0.0, 1.0), (0.0, 1.0)), (7, 7))
-        u = set!(scalar_field(g), x -> sinpi(x[1]) * sinpi(2 * x[2]) + x[1] * x[2])
+        u = set!(x -> sinpi(x[1]) * sinpi(2 * x[2]) + x[1] * x[2], scalar_field(g))
         I0 = CartesianIndex(4, 4)                        # a strictly interior cell
 
         function dLu_dkappa(build, κdata, I)
@@ -452,9 +452,9 @@ end
         κ = scalar_field(g, Float32)
         interior(κ) .= 1.0f0
         D = diffusion(g, κ)
-        y = D * set!(scalar_field(g, Float32), x -> sinpi(x[1]))
+        y = D * set!(x -> sinpi(x[1]), scalar_field(g, Float32))
         @test eltype(y.data) === Float32
-        @test collect(interior(y)) ≈ collect(interior(laplacian(g) * set!(scalar_field(g, Float32), x -> sinpi(x[1])))) rtol =
+        @test collect(interior(y)) ≈ collect(interior(laplacian(g) * set!(x -> sinpi(x[1]), scalar_field(g, Float32)))) rtol =
             1.0f-5
         @test Adapt.adapt(Array, D) isa Diffusion
     end
@@ -480,8 +480,8 @@ end
     @testset "coefficient grid compatibility" begin
         g = CartesianGrid(((0.0, 1.0),), (6,))
         equivalent = CartesianGrid(((0.0, 1.0),), (6,))
-        κ = set!(scalar_field(equivalent), _ -> 2)
-        u = set!(scalar_field(g), x -> sinpi(x[1]))
+        κ = set!(_ -> 2, scalar_field(equivalent))
+        u = set!(x -> sinpi(x[1]), scalar_field(g))
         @testset "$(nameof(typeof(avg))) check=$check" for avg in DIFF_AVGS,
             check in (true, false)
 
@@ -502,7 +502,7 @@ end
                 @test padded_size(other) == padded_size(g)
                 # Positive interiors pass the harmonic check on `other`, while
                 # its zero ghosts must never become interior coefficients on g.
-                foreign = set!(scalar_field(other), _ -> 2)
+                foreign = set!(_ -> 2, scalar_field(other))
                 @test all(>(0), interior(foreign))
                 @test_throws ArgumentError diffusion(
                     g, foreign; averaging=avg, check=check
@@ -518,7 +518,7 @@ end
         )
         D = diffusion(g, diff_kappa(g))
         L = laplacian(g)
-        u = set!(scalar_field(g), x -> sinpi(2 * x[1]) * x[2])
+        u = set!(x -> sinpi(2 * x[1]) * x[2], scalar_field(g))
         ints(f) = collect(interior(f))
 
         @test ints((D + L) * copy(u)) ≈ ints(D * copy(u)) .+ ints(L * copy(u))
@@ -533,7 +533,7 @@ end
 
     @testset "multigrid rediscretization" begin
         g = CartesianGrid(((0.0, 1.0), (0.0, 1.0)), (16, 16))
-        κ = set!(scalar_field(g), x -> 1 + x[1]^2 + x[2])
+        κ = set!(x -> 1 + x[1]^2 + x[2], scalar_field(g))
         D = diffusion(g, κ; averaging=HarmonicMean())
         gc = coarsen(g)
         Dc = MatrixFreeOperators._rediscretize(D, gc)

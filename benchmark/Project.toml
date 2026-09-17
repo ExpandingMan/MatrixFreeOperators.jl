@@ -6,5 +6,5 @@ StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
 [compat]
 BenchmarkTools = "1.5"
-MatrixFreeOperators = "0.1"
+MatrixFreeOperators = "0.2"
 julia = "1.10"

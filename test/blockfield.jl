@@ -23,9 +23,9 @@
     @testset "set! matches per-leaf standalone field" begin
         bf = BlockForest(base; blocksize=(4, 4), maxlevel=3)
         f = scalar_field(bf)
-        set!(f, x -> x[1] + 2x[2])
+        set!(x -> x[1] + 2x[2], f)
         for i in 1:MFO.nleaves(bf)
-            ref = set!(scalar_field(MFO.leaf_grid(bf, i)), x -> x[1] + 2x[2])
+            ref = set!(x -> x[1] + 2x[2], scalar_field(MFO.leaf_grid(bf, i)))
             @test collect(interior(MFO.block(f, i))) ≈ collect(interior(ref))
         end
     end
@@ -33,7 +33,7 @@
     @testset "flat ↔ interior round-trip (uniform)" begin
         bf = BlockForest(base; blocksize=(4, 4), maxlevel=3)
         f = scalar_field(bf)
-        set!(f, x -> sin(3x[1]) * cos(2x[2]))
+        set!(x -> sin(3x[1]) * cos(2x[2]), f)
         v = flatten(f)
         @test length(v) == MFO.flat_length(f) == 4 * 16   # nleaves·prod(blocksize)
         g = scalar_field(bf)
@@ -46,7 +46,7 @@
         refine!(bf, x -> x[1] < 0.4 && x[2] < 0.4)         # refine a corner region
         refine!(bf, x -> x[1] < 0.2 && x[2] < 0.2)
         f = scalar_field(bf)
-        set!(f, x -> x[1]^2 - x[2])
+        set!(x -> x[1]^2 - x[2], f)
         v = flatten(f)
         @test length(v) == MFO.flat_length(f) == MFO.nleaves(bf) * 16
         g = scalar_field(bf)
@@ -57,7 +57,7 @@
     @testset "interior_to_flat! axpby" begin
         bf = BlockForest(base; blocksize=(4, 4), maxlevel=3)
         f = scalar_field(bf)
-        set!(f, x -> x[1] - x[2])
+        set!(x -> x[1] - x[2], f)
         v = flatten(f)
         v2 = copy(v)
         interior_to_flat!(v2, f, 2.0, 3.0)                 # 2·interior + 3·v2 = 5v
@@ -67,7 +67,7 @@
     @testset "vector field round-trip" begin
         bf = BlockForest(base; blocksize=(4, 4), maxlevel=3)
         vf = vector_field(bf)
-        set!(vf, x -> SVector(x[1], x[2]))
+        set!(x -> SVector(x[1], x[2]), vf)
         w = flatten(vf)
         @test length(w) == MFO.flat_length(vf) == 4 * 16 * 2
         g = vector_field(bf)

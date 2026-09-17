@@ -105,11 +105,11 @@ step at field level with [`apply!`](@ref) instead.
 ```julia
 g = CartesianGrid(((0.0, 1.0),), (64,))
 A = prepare(laplacian(g))
-b = flatten(set!(scalar_field(g), x -> sin(π * x[1])))
+b = flatten(set!(x -> sin(π * x[1]), scalar_field(g)))
 u, stats = Krylov.minres(A, b)
 
 # explicit stepping stays at field level:
-uf = set!(scalar_field(g), x -> sin(π * x[1]))
+uf = set!(x -> sin(π * x[1]), scalar_field(g))
 du = similar(uf)
 dt = 0.4 * spacing(g)[1]^2              # forward-Euler bound
 apply!(du, A, uf)                       # or apply!(du, laplacian(g), uf)

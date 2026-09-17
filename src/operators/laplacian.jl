@@ -84,7 +84,7 @@ under the homogeneous ghost fills of all built-in boundary conditions.
 
 ```julia
 g = CartesianGrid(((0.0, 2π),), (64,); bc=((Periodic(), Periodic()),))
-u = set!(scalar_field(g), x -> sin(x[1]))
+u = set!(x -> sin(x[1]), scalar_field(g))
 Δu = laplacian(g) * u            # ≈ -u
 ```
 

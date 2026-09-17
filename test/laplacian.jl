@@ -4,7 +4,7 @@ function lap_periodic_error(n::Int, ::Val{D}) where {D}
         ntuple(_ -> n, Val(D));
         bc=ntuple(_ -> (Periodic(), Periodic()), Val(D)),
     )
-    u = set!(scalar_field(g), x -> prod(sin, x))
+    u = set!(x -> prod(sin, x), scalar_field(g))
     y = laplacian(g) * u
     return maximum(abs, collect(interior(y)) .+ D .* collect(interior(u)))
 end
@@ -62,9 +62,9 @@ end
             ((0.0, 2π), (0.0, 2π)), (16, 16);
             bc=((Periodic(), Periodic()), (Periodic(), Periodic())),
         )
-        v = set!(vector_field(g), x -> SVector(sin(x[1]) * sin(x[2]), cos(x[1])))
-        u1 = set!(scalar_field(g), x -> sin(x[1]) * sin(x[2]))
-        u2 = set!(scalar_field(g), x -> cos(x[1]))
+        v = set!(x -> SVector(sin(x[1]) * sin(x[2]), cos(x[1])), vector_field(g))
+        u1 = set!(x -> sin(x[1]) * sin(x[2]), scalar_field(g))
+        u2 = set!(x -> cos(x[1]), scalar_field(g))
         L = laplacian(g)
         Lv = L * v
         @test getindex.(collect(interior(Lv)), 1) ≈ collect(interior(L * u1))
@@ -73,7 +73,7 @@ end
 
     @testset "stencil primitive returns center value and Laplacian" begin
         g = CartesianGrid(((0.0, 1.0),), (4,); bc=((Neumann(), Neumann()),))
-        u = set!(scalar_field(g), x -> x[1]^2)
+        u = set!(x -> x[1]^2, scalar_field(g))
         apply_bc!(u)
         inv_h2 = inv.(spacing(g) .^ 2)
         uc, lap = laplacian_stencil(u.data, CartesianIndex(3), inv_h2)

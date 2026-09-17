@@ -47,7 +47,7 @@ end
     )
     rng = Random.MersenneTwister(61)
     w = rand(rng, local_size(g)...)
-    κ0 = set!(scalar_field(g), x -> 1 + x[1] * x[2])
+    κ0 = set!(x -> 1 + x[1] * x[2], scalar_field(g))
 
     @testset "field gradient of $(name)" for (name, L) in (
         ("Laplacian", laplacian(g)),
@@ -87,7 +87,7 @@ end
     end
 
     @testset "parameter gradient w.r.t. coefficient field κ (Decision B)" begin
-        u = set!(scalar_field(g), x -> sin(3 * x[1]) * x[2])
+        u = set!(x -> sin(3 * x[1]) * x[2], scalar_field(g))
         κ = 1.0 .+ rand(rng, padded_size(g)...)
         dκ = zero(κ)
         Enzyme.autodiff(
@@ -112,7 +112,7 @@ end
                                                                                           (
         ArithmeticMean(), HarmonicMean()
     )
-        u = set!(scalar_field(g), x -> sin(3 * x[1]) * x[2])
+        u = set!(x -> sin(3 * x[1]) * x[2], scalar_field(g))
         κ = 1.0 .+ rand(rng, padded_size(g)...)
         dκ = zero(κ)
         # set_runtime_activity, mirror image of the field-gradient case above: the leaf
@@ -201,7 +201,7 @@ end
         n = length(flatten(scalar_field(bf)))
         v = rand(rng, n)
         wf = rand(rng, n)
-        D = diffusion(bf, set!(scalar_field(bf), x -> 1.2 + 0.8 * x[1]^2 + 0.5 * x[2]);
+        D = diffusion(bf, set!(x -> 1.2 + 0.8 * x[1]^2 + 0.5 * x[2], scalar_field(bf));
                       averaging=avg)
 
         # Field gradient: Enzyme's taped derivative of the coarse-ghost flux rewrite
@@ -256,7 +256,7 @@ end
     @testset "gradient through the nonlinear leaf u·∇u" begin
         g1 = CartesianGrid(((0.0, 2π),), (16,); bc=((Periodic(), Periodic()),))
         F = advection(g1, SelfAdvection())
-        u = set!(vector_field(g1), x -> SVector(2 + sin(x[1])))
+        u = set!(x -> SVector(2 + sin(x[1])), vector_field(g1))
         wv = [SVector(rand(rng)) for _ in 1:16]
 
         du = zero(u.data)

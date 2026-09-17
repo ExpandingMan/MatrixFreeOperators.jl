@@ -518,7 +518,7 @@ object.
 
 ```julia
 g = CartesianGrid(((0.0, 1.0), (0.0, 1.0)), (64, 64))
-κ = set!(scalar_field(g), x -> 1 + x[1]^2)
+κ = set!(x -> 1 + x[1]^2, scalar_field(g))
 L = diffusion(g, κ)                                  # ∇·(κ∇u), compact 5-point
 Lj = diffusion(g, κ; averaging=HarmonicMean())       # flux-conserving across jumps
 ```
@@ -598,7 +598,7 @@ is unavailable on forest leaves, matching [`laplacian`](@ref).
 
 ```julia
 bf = BlockForest(CartesianGrid(((0.0, 1.0), (0.0, 1.0)), (16, 16)); blocksize=(8, 8), maxlevel=2)
-κ = set!(scalar_field(bf), x -> 1 + x[1]^2)
+κ = set!(x -> 1 + x[1]^2, scalar_field(bf))
 L = diffusion(bf, κ)
 ```
 """

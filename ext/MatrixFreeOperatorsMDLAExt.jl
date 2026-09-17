@@ -293,7 +293,7 @@ call it concurrently with a solve on the same prepared operator.
 
 ```julia
 P = prepare_distributed(laplacian(g), 2)
-b = set!(MultiDeviceVector{Float64}(undef, P.spec), P, x -> sin(x[1]))
+b = set!(x -> sin(x[1]), MultiDeviceVector{Float64}(undef, P.spec), P)
 b .-= boundary_rhs(P)
 u, stats = Krylov.cg(P, b)
 ```
@@ -333,12 +333,12 @@ MatrixFreeOperators.local_grids(P::MDLAPreparedOperator) =
     [Adapt.adapt(Array, p.grid) for p in P.parts]
 
 """
-    set!(x::MultiDeviceVector, P::MDLAPreparedOperator, fun) -> x
+    set!(fun, x::MultiDeviceVector, P::MDLAPreparedOperator) -> x
 
 Fill `x` with `fun(coords)` evaluated slab-locally on each partition.
 
-The distributed twin of `set!(::Field, fun)`, and exact: `cell_center` evaluates
-at the global cell index, so this is bit-for-bit `MultiDeviceVector(flatten(set!(scalar_field(g), fun)), P.spec)`
+The distributed twin of `set!(fun, ::Field)`, and exact: `cell_center` evaluates
+at the global cell index, so this is bit-for-bit `MultiDeviceVector(flatten(set!(fun, scalar_field(g))), P.spec)`
 without ever building the global field. Uses `P`'s input scratch, so the same
 concurrency caveat as `mul!` applies.
 
@@ -349,7 +349,7 @@ captured host arrays. For anything heavier, build the fields yourself on
 them.
 """
 function MatrixFreeOperators.set!(
-    x::MultiDeviceVector{T}, P::MDLAPreparedOperator{T}, fun
+    fun, x::MultiDeviceVector{T}, P::MDLAPreparedOperator{T}
 ) where {T}
     _dist_set!(P.xpads, fun, P.ctx)
     _dist_map!(P.ctx) do d
@@ -388,7 +388,7 @@ function MatrixFreeOperators.assemble_rhs(P::MDLAPreparedOperator{T}, f) where {
     return x
 end
 
-_source!(x, P::MDLAPreparedOperator, fun) = MatrixFreeOperators.set!(x, P, fun)
+_source!(x, P::MDLAPreparedOperator, fun) = MatrixFreeOperators.set!(fun, x, P)
 function _source!(x, P::MDLAPreparedOperator, fields::AbstractVector)
     length(fields) == length(P.parts) || throw(
         ArgumentError(

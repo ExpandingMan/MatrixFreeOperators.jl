@@ -100,7 +100,7 @@ function simulate(; snap_times=Float64[], on_frame=nothing, frame_every=250)
                          bc=ntuple(_ -> (Neumann(), Neumann()), 2))
     bf = BlockForest(base; blocksize=(BS, BS), maxlevel=MAXLEV)
 
-    V = set!(scalar_field(bf), x -> x[1] < 4.0 ? 1.0 : 0.0)   # S1 along the left edge
+    V = set!(x -> x[1] < 4.0 ? 1.0 : 0.0, scalar_field(bf))   # S1 along the left edge
     W = scalar_field(bf)
     dv, dw = zeros(BS, BS), zeros(BS, BS)
 

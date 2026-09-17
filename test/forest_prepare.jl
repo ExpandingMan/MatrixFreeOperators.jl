@@ -8,7 +8,7 @@
     bc = ((Dirichlet(), Dirichlet()), (Neumann(), Neumann()))
     g = CartesianGrid(((0.0, 1.0), (0.0, 1.0)), (16, 16); bc=bc)
     bf = BlockForest(g; blocksize=(4, 4), maxlevel=2)   # 16 leaves
-    uf = set!(scalar_field(bf), fun)
+    uf = set!(fun, scalar_field(bf))
     v = flatten(uf)
     out = similar(v)
 
@@ -68,7 +68,7 @@
         @test out ≈ materialize(prepare(inner))' * v
         @test alloc_mul(At, out, v) ≤ alloc_bound(MFO.nleaves(bf))
 
-        κ = set!(scalar_field(bf), x -> 1 + x[1] * x[2])
+        κ = set!(x -> 1 + x[1] * x[2], scalar_field(bf))
         K = divergence(bf) * scaling(κ)                          # vector → scalar
         Kt = prepare(MFO.AdjointOp(K), scalar_field(bf))
         B = materialize(prepare(K, vector_field(bf)))
@@ -122,7 +122,7 @@
         mul!(out2, A, v, 2.0, 3.0)
         @test out2 ≈ 2.0 .* per_operand_flat(aniso, uf) .+ 3.0 .* v
         # nested sums and a diagonal operand share too
-        κ = set!(scalar_field(bf), x -> 1 + x[1] * x[2])
+        κ = set!(x -> 1 + x[1] * x[2], scalar_field(bf))
         three = (aniso + scaling(κ)) + identity_op()
         A3 = prepare(three)
         @test prepared_exchanges(A3, v) == (1, 1)
@@ -162,7 +162,7 @@
         bfr = BlockForest(g; blocksize=(4, 4), maxlevel=3)
         refine!(bfr, x -> x[1] < 0.5 && x[2] < 0.5)
         balance!(bfr)
-        ur = set!(scalar_field(bfr), fun)
+        ur = set!(fun, scalar_field(bfr))
         vr = flatten(ur)
         anisor = 0.13 * laplacian(bfr) + 0.7 * derivative(bfr, 1; order=2)
         @test !isselfadjoint(anisor)

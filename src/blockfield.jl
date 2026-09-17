@@ -187,11 +187,19 @@ end
 Base.copy(f::BlockField{L,P}) where {L,P} =
     BlockField{L,P}([copy(b) for b in f.blocks], f.grid, f.generation)
 
-function set!(f::AbstractBlockField, fun::F) where {F}
-    for i in 1:nleaves(f.grid)
-        set!(block(f, i), fun)
+function set!(f::F, ϕ::AbstractBlockField) where {F}
+    for i in 1:nleaves(AbstractGrid(ϕ))
+        set!(f, block(ϕ, i))
     end
-    return f
+    return ϕ
+end
+
+function op!(f::F, ϕ::AbstractBlockField, ϕs::AbstractBlockField...; check::Bool=true) where {F}
+    check && check_compatible(ϕ, ϕs...)
+    for i ∈ 1:nleaves(AbstractGrid(ϕ))
+        op!(f, block(ϕ, i), map(ζ -> block(ζ, i), ϕs)...; check=false)
+    end
+    return ϕ
 end
 
 function zero_ghosts!(f::AbstractBlockField)
@@ -251,3 +259,24 @@ function _interior_to_flat_leaves!(v::AbstractVector, f::AbstractBlockField, α:
     end
     return v
 end
+
+# A forest field additionally carries the regrid generation its storage was
+# allocated on.  Two fields that are both current on compatible forests agree on
+# the leaf set by construction, so currency is the whole check — comparing the
+# generation *numbers* would be wrong across two independently built forests
+# (one regridded three times, one built fresh from the same leaf set).
+@inline _is_current(f::AbstractBlockField) = f.generation == f.grid.forest.generation[]
+
+@inline function _field_mismatch(a::AbstractBlockField, b::AbstractBlockField)
+    _is_current(a) || return :stale
+    _is_current(b) || return :stale
+    return _grid_mismatch(a.grid, b.grid)
+end
+
+@inline function _field_layout_mismatch(a::AbstractBlockField, b::AbstractBlockField)
+    _is_current(a) || return :stale
+    _is_current(b) || return :stale
+    return _layout_mismatch(a.grid, b.grid)
+end
+
+

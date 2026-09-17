@@ -8,8 +8,8 @@ CUDA.allowscalar(false)
         ((0.0, 2π), (0.0, 1.0)), (32, 24);
         bc=((Periodic(), Periodic()), (Dirichlet(), Neumann())),
     )
-    κ = set!(scalar_field(g), x -> 1 + x[1] / 7)
-    u = set!(scalar_field(g), x -> sin(x[1]) * x[2])
+    κ = set!(x -> 1 + x[1] / 7, scalar_field(g))
+    u = set!(x -> sin(x[1]) * x[2], scalar_field(g))
 
     @testset "operator action parity" begin
         for L in (laplacian(g), derivative(g, 2), scaling(κ) - laplacian(g))
@@ -36,7 +36,7 @@ CUDA.allowscalar(false)
             bc=((Periodic(), Periodic()), (Dirichlet(), Dirichlet())),
         )
         bf = BlockForest(base; blocksize=(8, 8), maxlevel=2)
-        uf = set!(scalar_field(bf), x -> sin(x[1]) * x[2])
+        uf = set!(x -> sin(x[1]) * x[2], scalar_field(bf))
         for L in (laplacian(bf), derivative(bf, 1; order=1))
             y_cpu = [
                 collect(interior(MFO.block(apply(L, copy(uf)), i))) for i in 1:MFO.nleaves(bf)
@@ -59,7 +59,7 @@ CUDA.allowscalar(false)
         bf = BlockForest(base; blocksize=(4, 4), maxlevel=2)
         refine!(bf, x -> x[1] < π && x[2] < 0.5)       # mixed levels: CF ghost fills run
         @test !bf.forest.uniform[]
-        uf = set!(scalar_field(bf), x -> sin(x[1]) * x[2])
+        uf = set!(x -> sin(x[1]) * x[2], scalar_field(bf))
         for L in (laplacian(bf), derivative(bf, 1; order=1))
             y_cpu = [
                 collect(interior(MFO.block(apply(L, copy(uf)), i))) for i in 1:MFO.nleaves(bf)
@@ -80,7 +80,7 @@ CUDA.allowscalar(false)
             bc=((Periodic(), Periodic()), (Dirichlet(), Dirichlet())),
         )
         bf = BlockForest(base; blocksize=(8, 8), maxlevel=2)
-        uf = set!(scalar_field(bf), x -> sin(x[1]) * x[2])
+        uf = set!(x -> sin(x[1]) * x[2], scalar_field(bf))
         ug = Adapt.adapt(CuArray, uf)
         vg = flatten(ug)                       # device vector, no scalar indexing
         @test vg isa CuArray
@@ -102,7 +102,7 @@ CUDA.allowscalar(false)
             bc=((Periodic(), Periodic()), (Dirichlet(), Dirichlet())),
         )
         bf = BlockForest(base; blocksize=(8, 8), maxlevel=2)
-        uf = set!(scalar_field(bf), x -> sin(x[1]) * x[2])
+        uf = set!(x -> sin(x[1]) * x[2], scalar_field(bf))
         p = pack(uf)
         pg = Adapt.adapt(CuArray, p)
         @test pg.data isa CuArray
@@ -127,7 +127,7 @@ CUDA.allowscalar(false)
 
         # refined forest: per-leaf levels SoA feeds the kernel on device
         refine!(bf, x -> x[1] < π)
-        ur = set!(scalar_field(bf), x -> sin(x[1]) * x[2])
+        ur = set!(x -> sin(x[1]) * x[2], scalar_field(bf))
         pr = pack(ur)
         yr = apply(laplacian(bf), copy(pr))
         prg = Adapt.adapt(CuArray, pr)
@@ -146,10 +146,10 @@ CUDA.allowscalar(false)
         for refined in (false, true)
             bf = BlockForest(base; blocksize=(8, 8), maxlevel=2)
             refined && refine!(bf, x -> x[1] < π)
-            u = set!(scalar_field(bf), sfun)
-            w = set!(vector_field(bf), wfun)
-            κp = pack(set!(scalar_field(bf), x -> 1 + x[2]^2))
-            velp = pack(set!(vector_field(bf), wfun))
+            u = set!(sfun, scalar_field(bf))
+            w = set!(wfun, vector_field(bf))
+            κp = pack(set!(x -> 1 + x[2]^2, scalar_field(bf)))
+            velp = pack(set!(wfun, vector_field(bf)))
             p = pack(u)
             pw = pack(w)
             pg = Adapt.adapt(CuArray, p)
@@ -186,9 +186,9 @@ CUDA.allowscalar(false)
             @test Array(outg) ≈ out
 
             # declared adjoint transpose-gather kernels + fold path on device
-            ys = pack(set!(scalar_field(bf), x -> cos(x[1]) + x[2]^2))
+            ys = pack(set!(x -> cos(x[1]) + x[2]^2, scalar_field(bf)))
             for L in (derivative(bf, 1; order=1), MFO.gradient(bf))
-                ȳ = L isa MFO.Gradient ? pack(set!(vector_field(bf), wfun)) : ys
+                ȳ = L isa MFO.Gradient ? pack(set!(wfun, vector_field(bf))) : ys
                 x̄ = apply_adjoint!(MFO.allocate_input(L, ȳ), L, copy(ȳ), bf)
                 x̄g = apply_adjoint!(
                     MFO.allocate_input(Adapt.adapt(CuArray, L), Adapt.adapt(CuArray, ȳ)),
@@ -203,7 +203,7 @@ CUDA.allowscalar(false)
             # both averaging policies; on the refined forest the coarse–fine flux
             # rewrite runs as device-view broadcasts ahead of the launch
             for avg in (ArithmeticMean(), HarmonicMean())
-                D = diffusion(bf, set!(scalar_field(bf), x -> 1 + x[2]^2); averaging=avg)
+                D = diffusion(bf, set!(x -> 1 + x[2]^2, scalar_field(bf)); averaging=avg)
                 Dp = MFO.Diffusion(bf, pack(D.κ), D.avg)
                 Dg = Adapt.adapt(CuArray, Dp)
                 y = apply(Dp, copy(p))
@@ -229,7 +229,7 @@ CUDA.allowscalar(false)
         )
         bf = BlockForest(base; blocksize=(4, 4), maxlevel=2)
         refine!(bf, x -> x[1] < π)
-        u = set!(scalar_field(bf), x -> sin(x[1]) * x[2])
+        u = set!(x -> sin(x[1]) * x[2], scalar_field(bf))
         p = pack(u)
         # host reference exchange + BC
         pr = copy(p)
@@ -263,7 +263,7 @@ CUDA.allowscalar(false)
         @test Array(outg2) ≈ out2
         # regrid invalidates the device schedule: fresh generation rebuilds
         refine!(bf, x -> x[2] < 0.5)
-        u2 = set!(scalar_field(bf), x -> sin(x[1]) * x[2])
+        u2 = set!(x -> sin(x[1]) * x[2], scalar_field(bf))
         pr2 = pack(u2)
         MFO.halo_update!(pr2, bf)
         pg3 = Adapt.adapt(CuArray, pack(u2))
@@ -277,9 +277,9 @@ CUDA.allowscalar(false)
     end
 
     @testset "Krylov cg parity" begin
-        σ = set!(scalar_field(g), x -> 1 + x[2])
+        σ = set!(x -> 1 + x[2], scalar_field(g))
         K = scaling(σ) - laplacian(g)
-        f = set!(scalar_field(g), x -> sin(x[1]))
+        f = set!(x -> sin(x[1]), scalar_field(g))
 
         P_cpu = prepare(K, scalar_field(g))
         b_cpu = flatten(f)
@@ -312,8 +312,8 @@ CUDA.allowscalar(false)
         # parity needs two independent forests; the GPU side adapts a twin whose
         # CPU original is used only to build the initial data.
         bf_cpu = mk()
-        u_cpu = set!(scalar_field(bf_cpu), bump)
-        u_gpu = Adapt.adapt(CuArray, set!(scalar_field(mk()), bump))
+        u_cpu = set!(bump, scalar_field(bf_cpu))
+        u_gpu = Adapt.adapt(CuArray, set!(bump, scalar_field(mk())))
         bf_gpu = u_gpu.grid
         @test first(u_gpu.blocks) isa CuArray
 
@@ -334,14 +334,14 @@ CUDA.allowscalar(false)
             flat_to_interior!(u, sol)
             return sol
         end
-        rhs = .-flatten(set!(scalar_field(bf_cpu), rhsf))    # identical topology ⇒ same layout
+        rhs = .-flatten(set!(rhsf, scalar_field(bf_cpu)))    # identical topology ⇒ same layout
         @test Array(cycle!(u_gpu, bf_gpu, CuArray(rhs))) ≈ cycle!(u_cpu, bf_cpu, rhs) rtol = 1e-6
 
         crit2 = b -> maximum(abs, interior(b)) > 0.5
         u_cpu = regrid!(u_cpu; refine=crit2)
         u_gpu = regrid!(u_gpu; refine=crit2)                 # prolongs solved data on device
         @test bf_gpu.forest.leaves == bf_cpu.forest.leaves
-        rhs2 = .-flatten(set!(scalar_field(bf_cpu), rhsf))
+        rhs2 = .-flatten(set!(rhsf, scalar_field(bf_cpu)))
         @test Array(cycle!(u_gpu, bf_gpu, CuArray(rhs2))) ≈ cycle!(u_cpu, bf_cpu, rhs2) rtol = 1e-6
 
         # coarsen everything back: the conservative child-mean path on device

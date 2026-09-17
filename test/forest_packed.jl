@@ -19,13 +19,13 @@
         for bc in bcs
             g = CartesianGrid(((0.0, 1.0), (0.0, 1.0)), (8, 8); bc=bc)
             bf = BlockForest(g; blocksize=(4, 4), maxlevel=2)
-            uf = set!(scalar_field(bf), fun)
+            uf = set!(fun, scalar_field(bf))
             for makeL in (laplacian, g -> derivative(g, 1; order=1))
                 L = makeL(bf)
                 @test interiors_equal(L * pack(uf), L * uf)
             end
             refine!(bf, x -> x[1] < 0.5)
-            ur = set!(scalar_field(bf), fun)
+            ur = set!(fun, scalar_field(bf))
             @test interiors_equal(laplacian(bf) * pack(ur), laplacian(bf) * ur)
         end
     end
@@ -41,7 +41,7 @@
             )
             bf = BlockForest(g; blocksize=(4, 4), maxlevel=2)
             refined && refine!(bf, x -> x[1] < 0.5)   # kernel reads per-leaf levels
-            u = set!(scalar_field(bf), fun)
+            u = set!(fun, scalar_field(bf))
             x = pack(u)
             MFO.halo_update!(x, bf)
             MFO.apply_bc!(x, bf)
@@ -73,7 +73,7 @@
         for bc in bcs
             g = CartesianGrid(((0.0, 1.0), (0.0, 1.0)), (8, 8); bc=bc)
             bf = BlockForest(g; blocksize=(4, 4), maxlevel=2)
-            uf = set!(scalar_field(bf), fun)
+            uf = set!(fun, scalar_field(bf))
             # Uniform forest: isselfadjoint(Laplacian) is live-true, so the adjoint
             # action IS the kernel sweep.
             At = apply_adjoint!(similar(pack(uf)), laplacian(bf), pack(uf), bf)
@@ -113,14 +113,14 @@
         for bc in bcs
             g = CartesianGrid(((0.0, 1.0), (0.0, 1.0)), (8, 8); bc=bc)
             bf = BlockForest(g; blocksize=(4, 4), maxlevel=2)
-            uf = set!(scalar_field(bf), fun)
+            uf = set!(fun, scalar_field(bf))
             p = pack(uf)
             S = 2.0 * laplacian(bf) + adjoint(derivative(bf, 1; order=1))
             @test interiors_equal(S * copy(p), S * copy(uf))
             DG = divergence(bf) * MFO.gradient(bf)   # packed SVector intermediate
             @test interiors_equal(DG * copy(p), DG * copy(uf))
             @test interiors_equal(MFO.gradient(bf) * p, MFO.gradient(bf) * uf)
-            w = set!(vector_field(bf), vfun)
+            w = set!(vfun, vector_field(bf))
             @test interiors_equal(divergence(bf) * pack(w), divergence(bf) * w)
         end
     end
@@ -142,7 +142,7 @@
         bc = ((Dirichlet(), Dirichlet()), (Neumann(), Neumann()))
         g = CartesianGrid(((0.0, 1.0), (0.0, 1.0)), (16, 16); bc=bc)
         bf = BlockForest(g; blocksize=(4, 4), maxlevel=2)
-        uf = set!(scalar_field(bf), fun)
+        uf = set!(fun, scalar_field(bf))
         v = flatten(uf)
         out = similar(v)
         A = prepare(laplacian(bf), pack(uf))
@@ -190,7 +190,7 @@
         for n in (16, 32)
             gn = CartesianGrid(((0.0, 1.0), (0.0, 1.0)), (n, n); bc=bc)
             bfn = BlockForest(gn; blocksize=(4, 4), maxlevel=2)
-            un = set!(scalar_field(bfn), fun)
+            un = set!(fun, scalar_field(bfn))
             vn = flatten(un)
             P = prepare(laplacian(bfn), pack(un))
             a, s = alloc_mul(P, similar(vn), vn)
@@ -216,7 +216,7 @@
         allocs = map((16, 32)) do n
             gn = CartesianGrid(((0.0, 1.0), (0.0, 1.0)), (n, n); bc=bc)
             bfn = BlockForest(gn; blocksize=(4, 4), maxlevel=2)
-            x = pack(set!(scalar_field(bfn), fun))
+            x = pack(set!(fun, scalar_field(bfn)))
             MFO.halo_update!(x, bfn)
             MFO.apply_bc!(x, bfn)
             a, s = alloc_launch(kernel!, MFO._zero_all!(similar(x)), x, bfn)
@@ -232,9 +232,9 @@
             g = CartesianGrid(((0.0, 1.0), (0.0, 1.0)), (8, 8); bc=bc)
             bf = BlockForest(g; blocksize=(4, 4), maxlevel=2)
             refined && refine!(bf, x -> x[1] < 0.5)
-            uf = set!(scalar_field(bf), fun)
-            κ = set!(scalar_field(bf), x -> 1 + x[1]^2 + 0.5 * x[2])
-            vel = set!(vector_field(bf), vfun)
+            uf = set!(fun, scalar_field(bf))
+            κ = set!(x -> 1 + x[1]^2 + 0.5 * x[2], scalar_field(bf))
+            vel = set!(vfun, vector_field(bf))
             for makeL in (
                 g -> derivative(g, 2; order=2),
                 MFO.gradient,
@@ -248,7 +248,7 @@
                 L = makeL(bf)
                 @test interiors_equal(L * pack(uf), L * uf)
             end
-            w = set!(vector_field(bf), vfun)
+            w = set!(vfun, vector_field(bf))
             @test interiors_equal(divergence(bf) * pack(w), divergence(bf) * w)
             A = advection(bf, SelfAdvection())
             @test interiors_equal(apply(A, pack(w)), apply(A, w))
@@ -265,14 +265,14 @@
             bf = BlockForest(g; blocksize=(4, 4), maxlevel=2)
             refined && refine!(bf, x -> x[1] < 0.5)
             nd = (bf.blocksize..., MFO.nleaves(bf))
-            x = pack(set!(scalar_field(bf), fun))
+            x = pack(set!(fun, scalar_field(bf)))
             MFO.halo_update!(x, bf)
             MFO.apply_bc!(x, bf)
-            xw = pack(set!(vector_field(bf), vfun))
+            xw = pack(set!(vfun, vector_field(bf)))
             MFO.halo_update!(xw, bf)
             MFO.apply_bc!(xw, bf)
-            κp = pack(set!(scalar_field(bf), x -> 1 + x[1]^2))
-            velp = pack(set!(vector_field(bf), vfun))
+            κp = pack(set!(x -> 1 + x[1]^2, scalar_field(bf)))
+            velp = pack(set!(vfun, vector_field(bf)))
             cases = (
                 (
                     derivative(bf, 1; order=1), x,
@@ -360,8 +360,8 @@
             bf = BlockForest(g; blocksize=(4, 4), maxlevel=2)
             refined && refine!(bf, x -> x[1] < 0.5)
             ndp = (bf.blocksize .+ 2 .* bf.halo..., MFO.nleaves(bf))
-            ȳs = pack(set!(scalar_field(bf), fun))     # scalar cotangent
-            ȳv = pack(set!(vector_field(bf), vfun))    # vector cotangent
+            ȳs = pack(set!(fun, scalar_field(bf)))     # scalar cotangent
+            ȳv = pack(set!(vfun, vector_field(bf)))    # vector cotangent
             cases = (
                 (
                     laplacian(bf), ȳs,
@@ -413,11 +413,11 @@
             g = CartesianGrid(((0.0, 1.0), (0.0, 1.0)), (8, 8); bc=bc)
             bf = BlockForest(g; blocksize=(4, 4), maxlevel=2)
             refined && refine!(bf, x -> x[1] < 0.5)
-            vel = set!(vector_field(bf), vfun)
-            xs = pack(set!(scalar_field(bf), fun))
-            ys = pack(set!(scalar_field(bf), gfun))
-            yv = pack(set!(vector_field(bf), x -> SVector(gfun(x), fun(x))))
-            xv = pack(set!(vector_field(bf), vfun))
+            vel = set!(vfun, vector_field(bf))
+            xs = pack(set!(fun, scalar_field(bf)))
+            ys = pack(set!(gfun, scalar_field(bf)))
+            yv = pack(set!(x -> SVector(gfun(x), fun(x)), vector_field(bf)))
+            xv = pack(set!(vfun, vector_field(bf)))
             for L in (derivative(bf, 1; order=1), derivative(bf, 2; order=2))
                 Lx = apply(L, copy(xs))
                 Lty = apply_adjoint!(similar(xs), L, copy(ys), bf)
@@ -448,9 +448,9 @@
             )
             bf = BlockForest(g; blocksize=(4, 4), maxlevel=2)
             refined && refine!(bf, x -> x[1] < 0.5)
-            κc = set!(scalar_field(bf, ComplexF64), x -> (1 + x[1]) + im * x[2])
-            xs = pack(set!(scalar_field(bf, ComplexF64), x -> fun(x) + 0.5im * x[1]))
-            ys = pack(set!(scalar_field(bf, ComplexF64), x -> gfun(x) - im * x[2]))
+            κc = set!(x -> (1 + x[1]) + im * x[2], scalar_field(bf, ComplexF64))
+            xs = pack(set!(x -> fun(x) + 0.5im * x[1], scalar_field(bf, ComplexF64)))
+            ys = pack(set!(x -> gfun(x) - im * x[2], scalar_field(bf, ComplexF64)))
             for S in (scaling(κc), scaling(pack(κc)), scaling(1.5 + 2.0im))
                 Sx = apply(S, copy(xs))
                 Sty = apply_adjoint!(similar(xs), S, copy(ys), bf)
@@ -463,9 +463,9 @@
         bc = ((Dirichlet(), Dirichlet()), (Neumann(), Neumann()))
         g = CartesianGrid(((0.0, 1.0), (0.0, 1.0)), (16, 16); bc=bc)
         bf = BlockForest(g; blocksize=(4, 4), maxlevel=2)
-        uf = set!(scalar_field(bf), fun)
-        κ = set!(scalar_field(bf), x -> 1 + x[1]^2 + 0.5 * x[2])
-        vel = set!(vector_field(bf), vfun)
+        uf = set!(fun, scalar_field(bf))
+        κ = set!(x -> 1 + x[1]^2 + 0.5 * x[2], scalar_field(bf))
+        vel = set!(vfun, vector_field(bf))
         v = flatten(uf)
 
         K = divergence(bf) * scaling(κ) * MFO.gradient(bf)
@@ -511,18 +511,18 @@
         bc = ((Dirichlet(), Dirichlet()), (Dirichlet(), Dirichlet()))
         g = CartesianGrid(((0.0, 1.0), (0.0, 1.0)), (8, 8); bc=bc)
         bf = BlockForest(g; blocksize=(4, 4), maxlevel=2)
-        κp = pack(set!(scalar_field(bf), x -> 1 + x[1]))
-        velp = pack(set!(vector_field(bf), vfun))
+        κp = pack(set!(x -> 1 + x[1], scalar_field(bf)))
+        velp = pack(set!(vfun, vector_field(bf)))
         S = scaling(κp)
         A = advection(bf, velp)
         refine!(bf, _ -> true)
-        xfresh = pack(set!(scalar_field(bf), fun))
+        xfresh = pack(set!(fun, scalar_field(bf)))
         @test_throws ArgumentError apply(S, xfresh)   # stale packed coefficient
         @test_throws ArgumentError apply(A, xfresh)   # stale packed velocity
 
         bf2 = BlockForest(g; blocksize=(4, 4), maxlevel=2)
-        κ2 = set!(scalar_field(bf2), x -> 1 + x[1])
-        u2 = set!(scalar_field(bf2), fun)
+        κ2 = set!(x -> 1 + x[1], scalar_field(bf2))
+        u2 = set!(fun, scalar_field(bf2))
         P = prepare(divergence(bf2) * scaling(κ2) * MFO.gradient(bf2), pack(u2))
         v2 = flatten(u2)
         refine!(bf2, _ -> true)
@@ -554,10 +554,10 @@
         allocs = map((16, 32)) do n
             gn = CartesianGrid(((0.0, 1.0), (0.0, 1.0)), (n, n); bc=bc)
             bfn = BlockForest(gn; blocksize=(4, 4), maxlevel=2)
-            x = pack(set!(scalar_field(bfn), fun))
+            x = pack(set!(fun, scalar_field(bfn)))
             MFO.halo_update!(x, bfn)
             MFO.apply_bc!(x, bfn)
-            velp = pack(set!(vector_field(bfn), vfun))
+            velp = pack(set!(vfun, vector_field(bfn)))
             a1, s1 = alloc_adv(adv!, MFO._zero_all!(similar(x)), x, velp, bfn)
             @test isfinite(s1)
             ȳ = copy(x)

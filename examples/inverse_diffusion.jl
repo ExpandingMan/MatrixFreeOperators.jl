@@ -62,10 +62,10 @@ end
 
 # This example uses one drive. The data are sensitive to κ through the flux κ∇u,
 # so recovery remains weak where this excitation's gradient is small.
-u = set!(scalar_field(g), x -> sinpi(x[1]) * sinpi(x[2]))
+u = set!(x -> sinpi(x[1]) * sinpi(x[2]), scalar_field(g))
 
 rng = MersenneTwister(20260731)
-κ★ = set!(scalar_field(g), κ_true)
+κ★ = set!(κ_true, scalar_field(g))
 clean = collect(response(κ★.data, u.data, g))
 obs = clean .+ 0.01 * maximum(abs, clean) .* randn(rng, size(clean))
 

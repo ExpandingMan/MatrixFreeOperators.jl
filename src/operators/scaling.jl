@@ -36,7 +36,7 @@ the natural Jacobi-smoother target.
 
 ```julia
 g = CartesianGrid(((0.0, 1.0),), (64,))
-κ = set!(scalar_field(g), x -> 1 + x[1]^2)
+κ = set!(x -> 1 + x[1]^2, scalar_field(g))
 H = laplacian(g) - scaling(κ)                    # Helmholtz-type: Δu − κu
 ```
 

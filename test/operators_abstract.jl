@@ -37,7 +37,7 @@ end
 
 @testset "Operator abstraction" begin
     g = CartesianGrid(((0.0, 1.0),), (4,))
-    u = set!(scalar_field(g), x -> x[1])
+    u = set!(x -> x[1], scalar_field(g))
 
     @testset "trait defaults make the weak claim" begin
         L = DummyNonlinearOp()
@@ -66,7 +66,7 @@ end
         @test collect(interior(L(u))) == collect(interior(y))
         @test collect(interior(L * u)) == collect(interior(y))
 
-        z = set!(scalar_field(g), x -> 1.0)
+        z = set!(x -> 1.0, scalar_field(g))
         MatrixFreeOperators.apply!(z, L, u, g, 3.0, 2.0)
         @test collect(interior(z)) ≈ 6 .* collect(interior(u)) .+ 2
     end
@@ -191,7 +191,7 @@ end
             a = @allocated apply_adjoint!(x̄, L, ȳ, g, 1.5, 2.0)
             return a, sum(interior(x̄))   # DCE-proof: consume the output
         end
-        κa = set!(scalar_field(ga), x -> 1 + x[1] * x[2])
+        κa = set!(x -> 1 + x[1] * x[2], scalar_field(ga))
         κa.data .= ifelse.(iszero.(κa.data), one(eltype(κa.data)), κa.data)   # incl. ghosts
         for L in (
             laplacian(ga),
@@ -199,7 +199,7 @@ end
             laplacian(ga) + derivative(ga, 2; order=2),
             MatrixFreeOperators.Diffusion(ga, κa, ArithmeticMean()),
         )
-            ȳ = set!(scalar_field(ga), x -> sinpi(x[1]) * exp(-x[2]))
+            ȳ = set!(x -> sinpi(x[1]) * exp(-x[2]), scalar_field(ga))
             a, s = alloc_adjoint(L, scalar_field(ga), ȳ, ga)
             @test isfinite(s) && !iszero(s)
             @test a ≤ 512

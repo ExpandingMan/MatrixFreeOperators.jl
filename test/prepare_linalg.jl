@@ -69,11 +69,11 @@
         function poisson_error(n)
             g = CartesianGrid(((0.0, 1.0),), (n,))
             A = prepare(laplacian(g))
-            f = set!(scalar_field(g), x -> π^2 * sin(π * x[1]))
+            f = set!(x -> π^2 * sin(π * x[1]), scalar_field(g))
             b = -flatten(f)
             u, stats = Krylov.minres(A, b)
             @test stats.solved
-            ustar = flatten(set!(scalar_field(g), x -> sin(π * x[1])))
+            ustar = flatten(set!(x -> sin(π * x[1]), scalar_field(g)))
             return maximum(abs, u .- ustar)
         end
         e32 = poisson_error(32)
@@ -101,7 +101,7 @@
             ((0.0, 1.0), (0.0, 1.0)), (8, 6);
             bc=((Dirichlet(), Dirichlet()), (Periodic(), Periodic())),
         )
-        κ = set!(scalar_field(g), x -> 1 + x[1])
+        κ = set!(x -> 1 + x[1], scalar_field(g))
         K = divergence(g) * scaling(κ) * MatrixFreeOperators.gradient(g)
         P = prepare(K, scalar_field(g))
         @test P.op isa MatrixFreeOperators.PreparedComposed
@@ -126,7 +126,7 @@
             ((0.0, 1.0), (0.0, 1.0)), (5, 4);
             bc=((Dirichlet(), Neumann()), (Periodic(), Periodic())),
         )
-        v = set!(vector_field(g), x -> SVector(1 + x[1], x[2]))
+        v = set!(x -> SVector(1 + x[1], x[2]), vector_field(g))
         Adv = advection(g, v)
         P = prepare(Adv, scalar_field(g))
         Pt = prepare(adjoint(Adv), scalar_field(g))
@@ -163,7 +163,7 @@
         @test P.op isa MatrixFreeOperators.PreparedComposed
         @test materialize(P) ≈ materialize(prepare(inner))'
 
-        κ = set!(scalar_field(g), x -> 1 + x[1] * x[2])
+        κ = set!(x -> 1 + x[1] * x[2], scalar_field(g))
         K = divergence(g) * scaling(κ)                           # vector → scalar
         Kt = prepare(MatrixFreeOperators.AdjointOp(K), scalar_field(g))
         B = materialize(prepare(K, vector_field(g)))
@@ -190,14 +190,14 @@
             σf(x) = 1 + x[1] * x[2]
             ustar(x) = sin(π * x[1]) * sin(π * x[2])
             f(x) = 2 * π^2 * ustar(x) + σf(x) * ustar(x)
-            σ = set!(scalar_field(g), σf)
+            σ = set!(σf, scalar_field(g))
             K = scaling(σ) - laplacian(g)
             @test isselfadjoint(K)
             P = prepare(K, scalar_field(g))
-            b = flatten(set!(scalar_field(g), f))
+            b = flatten(set!(f, scalar_field(g)))
             u, stats = Krylov.cg(P, b)
             @test stats.solved
-            return maximum(abs, u .- flatten(set!(scalar_field(g), ustar)))
+            return maximum(abs, u .- flatten(set!(ustar, scalar_field(g))))
         end
         e16 = helmholtz_error(16)
         e32 = helmholtz_error(32)
@@ -214,13 +214,13 @@
         @test all(iszero, collect(interior(apply(L, zero_in))))      # islinear ⇒ L(0) = 0
 
         b = boundary_rhs(L, g)
-        f = set!(scalar_field(g), x -> π^2 * sin(π * x[1]))
+        f = set!(x -> π^2 * sin(π * x[1]), scalar_field(g))
         rhs = -flatten(f) .- flatten(b)                               # Δu = -f  ⇒  A·u = -f - b
         P = prepare(L)
         u, stats = Krylov.minres(P, rhs)
         @test stats.solved
         ustar = flatten(
-            set!(scalar_field(g), x -> sin(π * x[1]) + (1 - x[1]) * a + x[1] * c)
+            set!(x -> sin(π * x[1]) + (1 - x[1]) * a + x[1] * c, scalar_field(g))
         )
         @test maximum(abs, u .- ustar) < 0.01
     end
@@ -240,9 +240,9 @@
             ((0.0, 1.0), (0.0, 1.0)), (6, 5);
             bc=((Dirichlet(), Neumann()), (Periodic(), Periodic())),
         )
-        κ = set!(scalar_field(g), x -> 1 + x[1] * x[2])
-        v = set!(vector_field(g), x -> SVector(1 + x[1], x[2]))
-        u0 = set!(scalar_field(g), x -> sin(π * x[1]))
+        κ = set!(x -> 1 + x[1] * x[2], scalar_field(g))
+        v = set!(x -> SVector(1 + x[1], x[2]), vector_field(g))
+        u0 = set!(x -> sin(π * x[1]), scalar_field(g))
         Lap = laplacian(g)
         Adv = advection(g, v)
         S = scaling(κ)
@@ -323,8 +323,8 @@
         # pins the coefficient's type so the rewrite is actually exercised, then holds
         # the rebuilt tree to the traits of the tree handed in — including the ones
         # that are false (isdiagonal of Diffusion, isselfadjoint of Advection).
-        κf = set!(scalar_field(bf), x -> 1 + x[1] * x[2])
-        vf = set!(vector_field(bf), x -> SVector(1 + x[1], x[2]))
+        κf = set!(x -> 1 + x[1] * x[2], scalar_field(bf))
+        vf = set!(x -> SVector(1 + x[1], x[2]), vector_field(bf))
         Sf = scaling(κf)
         Dif = diffusion(bf, κf)
         Af = advection(bf, vf)
@@ -379,13 +379,13 @@
         @test MFO.adjoint_operator(P.op) === D1
         # a diagonal leaf wrapped by hand — no prepare path builds one, but the
         # declared transpose must still be the leaf, not a lazy wrapper of the twin
-        S = scaling(set!(scalar_field(g), x -> 1 + x[1]))
+        S = scaling(set!(x -> 1 + x[1], scalar_field(g)))
         Sᵀ = MFO.PreparedAdjoint(S, scalar_field(g))
         @test isdiagonal(Sᵀ)
         @test MFO.adjoint_operator(Sᵀ) === S
         @test !(MFO.adjoint_operator(Sᵀ) isa AdjointOp)
 
-        ȳ = set!(scalar_field(g), x -> sin(2π * x[2]) * (1 - x[1]) + x[1]^2)
+        ȳ = set!(x -> sin(2π * x[2]) * (1 - x[1]) + x[1]^2, scalar_field(g))
         x̄ = scalar_field(g)
         apply_adjoint!(x̄, P.op, ȳ, g)
         yref = apply(D1, ȳ)
@@ -399,7 +399,7 @@
         )
         bf = BlockForest(gp; blocksize=(4, 4), maxlevel=2)
         Df = derivative(bf, 1; order=1)
-        Sf = scaling(set!(scalar_field(bf), x -> 1 + x[1] * x[2]))
+        Sf = scaling(set!(x -> 1 + x[1] * x[2], scalar_field(bf)))
         # PreparedAdjoint(Df) alone, and nested as a factor of a PreparedComposed:
         # (Sfᵀ ∘ Dfᵀ)ᵀ = Df ∘ Sf — the transpose walk recurses into the twin.
         for (label, Lt, Lref) in (
@@ -428,7 +428,7 @@
     @testset "boundary_rhs through combinators" begin
         g = CartesianGrid(((0.0, 1.0),), (8,); bc=((Dirichlet(2.0), Neumann(1.0)),))
         L = laplacian(g)
-        S = scaling(set!(scalar_field(g), x -> 1 + x[1]))
+        S = scaling(set!(x -> 1 + x[1], scalar_field(g)))
         bL = collect(interior(boundary_rhs(L, g)))
         @test collect(interior(boundary_rhs(3 * L, g))) ≈ 3 .* bL
         @test collect(interior(boundary_rhs(L + L, g))) ≈ 2 .* bL

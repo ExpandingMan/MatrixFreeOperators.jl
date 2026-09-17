@@ -4,9 +4,9 @@
             ((0.0, 1.0), (0.0, 1.0)), (6, 5);
             bc=((Dirichlet(), Neumann()), (Periodic(), Periodic())),
         )
-        κ = set!(scalar_field(g), x -> 1 + x[1])
-        v = set!(vector_field(g), x -> SVector(x[1], 1.0))
-        u = set!(scalar_field(g), x -> sin(x[1]) * x[2])
+        κ = set!(x -> 1 + x[1], scalar_field(g))
+        v = set!(x -> SVector(x[1], 1.0), vector_field(g))
+        u = set!(x -> sin(x[1]) * x[2], scalar_field(g))
 
         K = divergence(g) * scaling(κ) * MatrixFreeOperators.gradient(g)
         ops = (
@@ -45,7 +45,7 @@
             bc=((Dirichlet(), Dirichlet()), (Periodic(), Periodic())),
         )
         bf = BlockForest(base; blocksize=(4, 4), maxlevel=2)
-        uf = set!(scalar_field(bf), x -> sin(x[1]) * x[2])
+        uf = set!(x -> sin(x[1]) * x[2], scalar_field(bf))
         L = laplacian(bf)
 
         L2 = Adapt.adapt(Array, L)

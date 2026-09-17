@@ -25,7 +25,7 @@ function l1_error(u, bf)
     e = 0.0
     for i in 1:MFO.nleaves(bf)
         sp = MFO._leaf_spacing(bf, bf.forest.leaves[i].level)
-        ref = set!(similar(MFO.block(u, i)), uexact)
+        ref = set!(uexact, similar(MFO.block(u, i)))
         e += sum(abs, interior(MFO.block(u, i)) .- interior(ref)) * prod(sp)
     end
     return e
@@ -33,7 +33,7 @@ end
 
 for cycle in 1:4
     P = prepare(laplacian(bf), u)
-    rhs = .-flatten(set!(scalar_field(bf), f))          # Δu = -f; Dirichlet lift is zero
+    rhs = .-flatten(set!(f, scalar_field(bf)))          # Δu = -f; Dirichlet lift is zero
     sol, stats = Krylov.gmres(P, rhs; rtol=1e-10)       # nonsymmetric on an adapted forest
     flat_to_interior!(u, sol)
     lo, hi = extrema(k -> k.level, bf.forest.leaves)

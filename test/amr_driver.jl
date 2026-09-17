@@ -14,7 +14,7 @@
             key = bf.forest.leaves[i]
             sp = MFO._leaf_spacing(bf, key.level)
             lg = MFO.leaf_grid(bf, i)
-            ref = set!(scalar_field(lg), fun)
+            ref = set!(fun, scalar_field(lg))
             r = collect(interior(MFO.block(u, i))) .- collect(interior(ref))
             e += sum(abs, r) * prod(sp)
         end
@@ -25,7 +25,7 @@
     function max_error(u, bf, fun)
         maximum(1:MFO.nleaves(bf)) do i
             lg = MFO.leaf_grid(bf, i)
-            ref = set!(similar(MFO.block(u, i)), fun)
+            ref = set!(fun, similar(MFO.block(u, i)))
             maximum(abs, interior(MFO.block(u, i)) .- interior(ref))
         end
     end
@@ -33,7 +33,7 @@
     @testset "marking and topology semantics" begin
         base = CartesianGrid(((0.0, 1.0), (0.0, 1.0)), (16, 16); bc=dirbc)
         bf = BlockForest(base; blocksize=(4, 4), maxlevel=2)   # 4×4 roots
-        u = set!(scalar_field(bf), x -> x[1])
+        u = set!(x -> x[1], scalar_field(bf))
 
         # refine the right column (blocks whose data exceeds the threshold)
         u = regrid!(u; refine=b -> maximum(interior(b)) > 0.75)
@@ -69,7 +69,7 @@
     @testset "no-op regrid preserves fields and prepared operators" begin
         base = CartesianGrid(((0.0, 1.0), (0.0, 1.0)), (8, 8))
         bf = BlockForest(base; blocksize=(4, 4), maxlevel=1)
-        u = set!(scalar_field(bf), lin)
+        u = set!(lin, scalar_field(bf))
         w = scalar_field(bf)
         P = prepare(laplacian(bf), u)
         gen = bf.forest.generation[]
@@ -84,7 +84,7 @@
         for bc in (dirbc, mixbc, perbc)
             base = CartesianGrid(((0.0, 1.0), (0.0, 1.0)), (16, 16); bc=bc)
             bf = BlockForest(base; blocksize=(4, 4), maxlevel=2)
-            u = set!(scalar_field(bf), lin)
+            u = set!(lin, scalar_field(bf))
 
             # refine a band touching the physical boundary: one-sided edge taps and
             # boundary-adjacent blocks are exercised for every BC kind
@@ -102,7 +102,7 @@
     @testset "balance-cascade leaves are transferred (key-based, not mark-based)" begin
         base = CartesianGrid(((0.0, 1.0), (0.0, 1.0)), (16, 16); bc=dirbc)
         bf = BlockForest(base; blocksize=(4, 4), maxlevel=2)
-        u = set!(scalar_field(bf), lin)
+        u = set!(lin, scalar_field(bf))
         u = regrid!(u; refine=b -> b.grid.extent[1][1] < 0.25 && b.grid.extent[2][1] < 0.25)
         gen1 = bf.forest.generation[]
         # corner → level 2 forces balance! to refine unmarked neighbors to level 1
@@ -118,20 +118,20 @@
         vfun = x -> SVector(x[1] - 2x[2], 1 + x[2])
 
         bf = BlockForest(base; blocksize=(4, 4), maxlevel=1)
-        u = set!(scalar_field(bf), lin)
-        w = set!(vector_field(bf), vfun)
+        u = set!(lin, scalar_field(bf))
+        w = set!(vfun, vector_field(bf))
         band = b -> b.grid.extent[1][1] < 0.5
         u2, w2 = regrid!(u, w; refine=band)
         @test u2 isa BlockField && w2 isa BlockField
         werr = maximum(1:MFO.nleaves(bf)) do i
-            ref = set!(similar(MFO.block(w2, i)), vfun)
+            ref = set!(vfun, similar(MFO.block(w2, i)))
             maximum(norm, interior(MFO.block(w2, i)) .- interior(ref))
         end
         @test werr < 1e-13
 
         # the same regrid of a lone field gives bit-identical blocks
         bf3 = BlockForest(base; blocksize=(4, 4), maxlevel=1)
-        u3 = set!(scalar_field(bf3), lin)
+        u3 = set!(lin, scalar_field(bf3))
         u3 = regrid!(u3; refine=band)
         @test all(i -> u3.blocks[i] == u2.blocks[i], 1:MFO.nleaves(bf3))
     end
@@ -141,7 +141,7 @@
         function refine_transfer_error(ncells)
             base = CartesianGrid(((0.0, 2π), (0.0, 2π)), (ncells, ncells); bc=perbc)
             bf = BlockForest(base; blocksize=(4, 4), maxlevel=1)
-            u = set!(scalar_field(bf), fun)
+            u = set!(fun, scalar_field(bf))
             u = regrid!(u; refine=b -> b.grid.extent[1][1] < 1.6)
             @test !bf.forest.uniform[]
             return l1_error(u, bf, fun)
@@ -149,9 +149,9 @@
         function coarsen_transfer_error(ncells)
             base = CartesianGrid(((0.0, 2π), (0.0, 2π)), (ncells, ncells); bc=perbc)
             bf = BlockForest(base; blocksize=(4, 4), maxlevel=1)
-            ind = set!(scalar_field(bf), x -> x[1] < 1.6 ? 1.0 : 0.0)
+            ind = set!(x -> x[1] < 1.6 ? 1.0 : 0.0, scalar_field(bf))
             regrid!(ind; refine=b -> maximum(interior(b)) > 0.5)
-            u = set!(scalar_field(bf), fun)
+            u = set!(fun, scalar_field(bf))
             u = regrid!(u; refine=Returns(false), coarsen=Returns(true))
             @test bf.forest.uniform[]
             return l1_error(u, bf, fun)
@@ -167,7 +167,7 @@
     @testset "staleness and argument errors" begin
         base = CartesianGrid(((0.0, 1.0), (0.0, 1.0)), (16, 16); bc=dirbc)
         bf = BlockForest(base; blocksize=(4, 4), maxlevel=1)
-        u = set!(scalar_field(bf), lin)
+        u = set!(lin, scalar_field(bf))
         P = prepare(laplacian(bf), u)
         v = flatten(u)
         u2 = regrid!(u; refine=b -> b.grid.extent[1][1] < 0.5)
@@ -188,9 +188,9 @@
         rng = Random.MersenneTwister(29)
         base = CartesianGrid(((0.0, 1.0), (0.0, 1.0)), (16, 16); bc=mixbc)
         bf = BlockForest(base; blocksize=(4, 4), maxlevel=3)
-        ind = set!(scalar_field(bf), x -> x[1] < 0.5 && x[2] < 0.5 ? 1.0 : 0.0)
+        ind = set!(x -> x[1] < 0.5 && x[2] < 0.5 ? 1.0 : 0.0, scalar_field(bf))
         ind = regrid!(ind; refine=b -> maximum(interior(b)) > 0.5)
-        ind2 = set!(scalar_field(bf), x -> x[1] < 0.2 && x[2] < 0.2 ? 1.0 : 0.0)
+        ind2 = set!(x -> x[1] < 0.2 && x[2] < 0.2 ? 1.0 : 0.0, scalar_field(bf))
         regrid!(ind2; refine=b -> maximum(interior(b)) > 0.5)    # levels 0–2
         @test maximum(k -> k.level, bf.forest.leaves) == 2
 
@@ -245,10 +245,10 @@
         function l1_action_error(ncells)
             base = CartesianGrid(((0.0, 2π), (0.0, 2π)), (ncells, ncells); bc=perbc)
             bf = BlockForest(base; blocksize=(4, 4), maxlevel=2)
-            ind = set!(scalar_field(bf), x -> x[1] < 1.6 ? 1.0 : 0.0)
+            ind = set!(x -> x[1] < 1.6 ? 1.0 : 0.0, scalar_field(bf))
             regrid!(ind; refine=b -> maximum(interior(b)) > 0.5)
             @test !bf.forest.uniform[]
-            u = set!(scalar_field(bf), x -> sin(x[1]) * sin(x[2]))
+            u = set!(x -> sin(x[1]) * sin(x[2]), scalar_field(bf))
             Lu = laplacian(bf) * u
             e = 0.0
             for i in 1:MFO.nleaves(bf)
@@ -282,7 +282,7 @@
         errs = Float64[]
         for cycle in 1:3
             P = prepare(laplacian(bf), u)
-            rhs = .-flatten(set!(scalar_field(bf), f))   # Δu = −f
+            rhs = .-flatten(set!(f, scalar_field(bf)))   # Δu = −f
             sol, stats = Krylov.gmres(P, rhs; rtol=1e-10)
             @test stats.solved
             flat_to_interior!(u, sol)
@@ -310,7 +310,7 @@
     @testset "re-prepared mul! stays within the steady-state allocation budget" begin
         base = CartesianGrid(((0.0, 1.0), (0.0, 1.0)), (16, 16); bc=mixbc)
         bf = BlockForest(base; blocksize=(4, 4), maxlevel=1)
-        u = set!(scalar_field(bf), lin)
+        u = set!(lin, scalar_field(bf))
         u = regrid!(u; refine=b -> b.grid.extent[1][1] < 0.5)
         P = prepare(laplacian(bf), u)
         v = flatten(u)
@@ -326,7 +326,7 @@
     @testset "invalid transfer policies fail before regridding" begin
         base = CartesianGrid(((0.0, 1.0),), (8,))
         bf = BlockForest(base; blocksize=(4,), maxlevel=1)
-        u = set!(scalar_field(bf), x -> x[1])
+        u = set!(x -> x[1], scalar_field(bf))
         p = pack(u)
         generation = bf.forest.generation[]
         keys = copy(bf.forest.leaves)
@@ -354,7 +354,7 @@
     )
         base = CartesianGrid(((0.0, 1.0), (0.0, 1.0)), (8, 8))
         bf = BlockForest(base; blocksize=(4, 4), maxlevel=1)
-        u = set!(vector_field(bf; transfer=pol), x -> SVector(x[1], 2x[2]))
+        u = set!(x -> SVector(x[1], 2x[2]), vector_field(bf; transfer=pol))
         p = pack(u)
         generation = u.generation
 
@@ -405,8 +405,8 @@
         # Changing field units must not turn a sloped reconstruction into injection.
         base = CartesianGrid(((zero(T), one(T)),), (8,))
         bf = BlockForest(base; blocksize=(4,), maxlevel=1)
-        u = set!(scalar_field(bf, T; transfer=SlopeLimited()), x -> x[1])
-        v = set!(scalar_field(bf, T; transfer=SlopeLimited()), x -> tiny * x[1])
+        u = set!(x -> x[1], scalar_field(bf, T; transfer=SlopeLimited()))
+        v = set!(x -> tiny * x[1], scalar_field(bf, T; transfer=SlopeLimited()))
         u, v = regrid!(u, v; refine=Returns(true))
         @test isapprox(flatten(v) ./ tiny, flatten(u); rtol=8eps(T))
     end
@@ -433,7 +433,7 @@
         for (name, pol) in (("Conservative", Conservative()), ("SlopeLimited", SlopeLimited()))
             base = CartesianGrid(((0.0, 1.0), (0.0, 1.0)), (16, 16); bc=mixbc)
             bf = BlockForest(base; blocksize=(4, 4), maxlevel=2)
-            u = set!(scalar_field(bf; transfer=pol), curved)
+            u = set!(curved, scalar_field(bf; transfer=pol))
             m0, s0 = field_mass(u, bf)
             # refine a corner, then its inside — the second regrid forces balance!
             # to refine leaves the criteria never marked (issue #59's acceptance:
@@ -464,7 +464,7 @@
         # has teeth
         base = CartesianGrid(((0.0, 1.0), (0.0, 1.0)), (16, 16); bc=mixbc)
         bf = BlockForest(base; blocksize=(4, 4), maxlevel=2)
-        u = set!(scalar_field(bf), curved)
+        u = set!(curved, scalar_field(bf))
         m0, s0 = field_mass(u, bf)
         u = regrid!(u; refine=b -> b.grid.extent[1][1] < 0.25 && b.grid.extent[2][1] < 0.25)
         m1, _ = field_mass(u, bf)
@@ -496,7 +496,7 @@
         inner(b) = all(e -> e[2] < 0.26, b.grid.extent)
         for (base, bs, fun) in cases, pol in (Conservative(), SlopeLimited())
             bf = BlockForest(base; blocksize=bs, maxlevel=2)
-            u = set!(scalar_field(bf; transfer=pol), fun)
+            u = set!(fun, scalar_field(bf; transfer=pol))
             nl0 = MFO.nleaves(bf)
             m0, s0 = field_mass(u, bf)
             u = regrid!(u; refine=corner)
@@ -516,7 +516,7 @@
 
             # negative control in the same dimension
             bfi = BlockForest(base; blocksize=bs, maxlevel=2)
-            ui = set!(scalar_field(bfi), fun)
+            ui = set!(fun, scalar_field(bfi))
             mi0, si0 = field_mass(ui, bfi)
             ui = regrid!(ui; refine=corner)
             mi1, _ = field_mass(ui, bfi)
@@ -530,7 +530,7 @@
         # Conservative is exact on linears everywhere (centered and one-sided
         # slopes both reproduce a linear), like the default
         bf = BlockForest(base; blocksize=(4, 4), maxlevel=1)
-        u = set!(scalar_field(bf; transfer=Conservative()), lin)
+        u = set!(lin, scalar_field(bf; transfer=Conservative()))
         u = regrid!(u; refine=b -> b.grid.extent[1][1] < 0.5)
         @test max_error(u, bf, lin) < 1e-13
 
@@ -538,7 +538,7 @@
         # source's global bounds (minmod interior, zero slope at block edges)
         bf2 = BlockForest(base; blocksize=(4, 4), maxlevel=1)
         step = x -> x[1] < 0.4 ? 0.0 : 1.0
-        v = set!(scalar_field(bf2; transfer=SlopeLimited()), step)
+        v = set!(step, scalar_field(bf2; transfer=SlopeLimited()))
         lo, hi = extrema(
             reduce(vcat, [vec(collect(interior(MFO.block(v, i)))) for i in 1:MFO.nleaves(bf2)])
         )
@@ -549,15 +549,15 @@
         m_step, s_step = field_mass(v, bf2)   # and it still conserved
         # (mass computed post-refine equals pre-refine: recompute the reference)
         bf2b = BlockForest(base; blocksize=(4, 4), maxlevel=1)
-        v0 = set!(scalar_field(bf2b), step)
+        v0 = set!(step, scalar_field(bf2b))
         m0_step, _ = field_mass(v0, bf2b)
         @test abs(m_step - m0_step) ≤ 1e3 * eps() * s_step
 
         # SVector state conserves componentwise
         bf3 = BlockForest(base; blocksize=(4, 4), maxlevel=1)
         w = set!(
-            vector_field(bf3; transfer=Conservative()),
             x -> SVector(sin(3 * x[1]) + x[2]^2, cos(2 * x[2]) - x[1]^2),
+            vector_field(bf3; transfer=Conservative()),
         )
         msum(f, bfx) = sum(
             i -> prod(MFO._leaf_spacing(bfx, bfx.forest.leaves[i].level)) .*
@@ -586,7 +586,7 @@
         function refine_l1(ncells)
             base = CartesianGrid(((0.0, 1.0), (0.0, 1.0)), (ncells, ncells); bc=perbc)
             bf = BlockForest(base; blocksize=(4, 4), maxlevel=1)
-            u = set!(scalar_field(bf; transfer=Conservative()), smooth)
+            u = set!(smooth, scalar_field(bf; transfer=Conservative()))
             u = regrid!(u; refine=b -> b.grid.extent[1][1] < 0.5)
             return l1_error(u, bf, smooth)
         end

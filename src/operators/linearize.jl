@@ -70,7 +70,7 @@ The default [`FiniteDifferenceJVP`](@ref) keeps the core dependency-free;
 ```julia
 g = CartesianGrid(((0.0, 2π),), (64,); bc=((Periodic(), Periodic()),))
 F = advection(g, SelfAdvection())            # nonlinear u·∇u
-u0 = set!(vector_field(g), x -> SVector(sin(x[1])))
+u0 = set!(x -> SVector(sin(x[1])), vector_field(g))
 J = linearize(F, u0)                         # linear: v ↦ (∂F/∂u)|_{u0} · v
 P = prepare(J, u0)                           # Krylov-ready JFNK Jacobian
 
