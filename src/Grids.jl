@@ -84,7 +84,14 @@ function _validate_bc(bc::Tuple, ::Val{N}) where {N}
     return nothing
 end
 
-AbstractGrid(g::AbstractGrid) = g
+"""
+    getgrid(x) -> AbstractGrid
+
+Return the grid associated with `x`. A grid returns itself; a field returns the grid it
+was allocated on. Operators and combinators use this to reach the grid uniformly whether
+they were handed a grid or a field.
+"""
+getgrid(g::AbstractGrid) = g
 
 #--------------------------------------------------------------------------------# Grid interface
 
@@ -135,12 +142,32 @@ function interior(g::AbstractGrid{N}) where {N}
 end
 
 """
+    isinterior(g::AbstractGrid, I::CartesianIndex) -> Bool
+
+Whether `I`, in halo-padded index space, indexes an interior (owned, non-halo) cell
+of `g`, i.e. whether `I ∈ interior(g)`.
+"""
+function isinterior(g::AbstractGrid{N}, I::CartesianIndex{N}) where {N}
+    (h, n) = (halo_width(g), local_size(g))
+    return all(d -> h[d] < I[d] ≤ h[d] + n[d], 1:N)
+end
+
+"""
     padded_size(g::AbstractGrid) -> NTuple{N,Int}
 
 Array size per dimension including ghost layers on both faces.
 """
 padded_size(g::AbstractGrid{N}) where {N} =
     ntuple(d -> local_size(g)[d] + 2 * halo_width(g)[d], Val(N))
+
+"""
+    CartesianIndices(g::AbstractGrid) -> CartesianIndices
+
+Indices of every cell of `g` in halo-padded index space, ghost layers included; the
+full index set of a field's storage array on `g`. See [`interior`](@ref) for the owned
+cells only.
+"""
+Base.CartesianIndices(g::AbstractGrid) = CartesianIndices(padded_size(g))
 
 """
     cell_center(g::AbstractGrid, I::CartesianIndex) -> SVector
@@ -322,7 +349,7 @@ const _MISMATCH_REASONS = Dict{Symbol,String}(
     throw(
         ArgumentError(
             "incompatible $level: $reason. Got " *
-            "$(summary(AbstractGrid(a))) vs $(summary(AbstractGrid(b))) [$what]",
+            "$(summary(getgrid(a))) vs $(summary(getgrid(b))) [$what]",
         ),
     )
 end

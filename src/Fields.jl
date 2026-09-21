@@ -108,7 +108,7 @@ struct Field{L,A<:AbstractArray,G<:AbstractGrid} <: AbstractField
 end
 Field(data::AbstractArray, grid::AbstractGrid) = Field{Center}(data, grid)
 
-AbstractGrid(ϕ::AbstractField) = ϕ.grid
+getgrid(ϕ::AbstractField) = ϕ.grid
 
 """
     scalar_field(g::AbstractGrid, T=eltype(spacing(g))) -> Field
@@ -186,7 +186,7 @@ end
 See also: [`op!`](@ref), [`cell_center`](@ref).
 """
 function set!(f::F, ϕ::Field) where {F}
-    g = AbstractGrid(ϕ)
+    g = getgrid(ϕ)
     map!(interior(ϕ), interior(g)) do idx
         x = cell_center(g, idx)
         f(x)
@@ -222,7 +222,7 @@ See also: [`set!`](@ref), [`compatible`](@ref).
 """
 function op!(f::F, ϕ::Field, ϕs::Field...; check::Bool=true) where {F}
     check && check_compatible(ϕ, ϕs...)
-    g = AbstractGrid(ϕ)
+    g = getgrid(ϕ)
     map!(interior(ϕ), interior(g), interior(ϕ), map(interior, ϕs)...) do idx, a, b...
         x = cell_center(g, idx)
         f(x, a, b...)
@@ -420,4 +420,4 @@ boundary conditions.
     return check_layout(a, rest...)
 end
 
-nleaves(ϕ::Field) = nleaves(AbstractGrid(ϕ))
+nleaves(ϕ::Field) = nleaves(getgrid(ϕ))

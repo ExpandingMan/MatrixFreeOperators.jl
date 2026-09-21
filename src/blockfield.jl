@@ -188,7 +188,7 @@ Base.copy(f::BlockField{L,P}) where {L,P} =
     BlockField{L,P}([copy(b) for b in f.blocks], f.grid, f.generation)
 
 function set!(f::F, ϕ::AbstractBlockField) where {F}
-    for i in 1:nleaves(AbstractGrid(ϕ))
+    for i in 1:nleaves(getgrid(ϕ))
         set!(f, block(ϕ, i))
     end
     return ϕ
@@ -196,7 +196,7 @@ end
 
 function op!(f::F, ϕ::AbstractBlockField, ϕs::AbstractBlockField...; check::Bool=true) where {F}
     check && check_compatible(ϕ, ϕs...)
-    for i ∈ 1:nleaves(AbstractGrid(ϕ))
+    for i ∈ 1:nleaves(getgrid(ϕ))
         op!(f, block(ϕ, i), map(ζ -> block(ζ, i), ϕs)...; check=false)
     end
     return ϕ

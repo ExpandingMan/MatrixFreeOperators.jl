@@ -6,9 +6,9 @@ using StaticArrays: SVector
 import KernelAbstractions
 using KernelAbstractions: @Const, @index, @kernel
 
-export AbstractGrid, CartesianGrid
+export AbstractGrid, CartesianGrid, getgrid
 export dimension, spacing, local_size, halo_width, boundary_conditions
-export interior, padded_size, cell_center, coarsen, halo_update!, partition_grid
+export interior, isinterior, padded_size, cell_center, coarsen, halo_update!, partition_grid
 export AbstractBC, Periodic, Dirichlet, Neumann, apply_bc!, fold_bc!
 export BlockForest, BlockField, PackedBlockField, pack, unpack
 export refine!, coarsen!, balance!, leaves, regrid!
