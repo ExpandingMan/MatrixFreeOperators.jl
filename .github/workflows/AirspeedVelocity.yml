@@ -81,7 +81,11 @@ jobs:
             echo 'A plot of the benchmark results have been uploaded as an artifact to the workflow run for this PR.'
             echo 'Go to "Actions"->"Benchmark a pull request"->[the most recent run]->"Artifacts" (at the bottom).'
           } > body.md
+          cat body.md >> "$GITHUB_STEP_SUMMARY"
+      # A PR from a fork gets a read-only GITHUB_TOKEN whatever `permissions` asks for,
+      # so commenting would 403 and fail the check. Its results stay in the job summary.
       - name: Find Comment
+        if: github.event.pull_request.head.repo.full_name == github.repository
         uses: peter-evans/find-comment@v4
         id: fcbenchmark
         with:
@@ -89,6 +93,7 @@ jobs:
           comment-author: "github-actions[bot]"
           body-includes: Benchmark Results
       - name: Comment on PR
+        if: github.event.pull_request.head.repo.full_name == github.repository
         uses: peter-evans/create-or-update-comment@v5
         with:
           comment-id: ${{ steps.fcbenchmark.outputs.comment-id }}
