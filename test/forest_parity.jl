@@ -36,8 +36,8 @@ struct NoTraitOp85 <: AbstractOperator end
         for bc in bcs
             g = CartesianGrid(((0.0, 1.0), (0.0, 1.0)), (8, 8); bc=bc)
             bf = BlockForest(g; blocksize=(4, 4), maxlevel=2)   # level 0 ⇒ same (8, 8)
-            u = set!(scalar_field(g), fun)
-            uf = set!(scalar_field(bf), fun)
+            u = set!(fun, scalar_field(g))
+            uf = set!(fun, scalar_field(bf))
             for makeL in leaf_ops
                 ref = collect(interior(makeL(g) * u))
                 rec = reconstruct(makeL(bf) * uf, (8, 8))
@@ -53,8 +53,8 @@ struct NoTraitOp85 <: AbstractOperator end
             bf = BlockForest(base; blocksize=(4, 4), maxlevel=3)
             refine!(bf, _ -> true)                              # uniform level 1 = 16×16
             @test all(k -> k.level == 1, bf.forest.leaves)
-            u = set!(scalar_field(g16), fun)
-            uf = set!(scalar_field(bf), fun)
+            u = set!(fun, scalar_field(g16))
+            uf = set!(fun, scalar_field(bf))
             for makeL in leaf_ops
                 ref = collect(interior(makeL(g16) * u))
                 rec = reconstruct(makeL(bf) * uf, (16, 16))
@@ -109,7 +109,7 @@ struct NoTraitOp85 <: AbstractOperator end
         @test size(A) == (64, 64)                   # nleaves·prod(blocksize) = 4·16
         M = materialize(A)
         @test M ≈ M'                                # forest Laplacian is self-adjoint
-        uf = set!(scalar_field(bf), fun)
+        uf = set!(fun, scalar_field(bf))
         v = flatten(uf)
         out = similar(v)
         mul!(out, A, v)
@@ -120,8 +120,8 @@ struct NoTraitOp85 <: AbstractOperator end
         for bc in bcs
             g = CartesianGrid(((0.0, 1.0), (0.0, 1.0)), (8, 8); bc=bc)
             bf = BlockForest(g; blocksize=(4, 4), maxlevel=2)
-            u = set!(scalar_field(g), fun)
-            uf = set!(scalar_field(bf), fun)
+            u = set!(fun, scalar_field(g))
+            uf = set!(fun, scalar_field(bf))
             D = derivative(g, 1; order=1)            # order 1 ⇒ adjoint is an AdjointOp
             Df = derivative(bf, 1; order=1)
             @test Df' isa AdjointOp
@@ -156,8 +156,8 @@ struct NoTraitOp85 <: AbstractOperator end
         for bc in bcs
             g = CartesianGrid(((0.0, 1.0), (0.0, 1.0)), (8, 8); bc=bc)
             bf = BlockForest(g; blocksize=(4, 4), maxlevel=2)
-            u = set!(scalar_field(g), fun)
-            uf = set!(scalar_field(bf), fun)
+            u = set!(fun, scalar_field(g))
+            uf = set!(fun, scalar_field(bf))
             L2g = laplacian(g) * laplacian(g)
             L2f = laplacian(bf) * laplacian(bf)
             @test reconstruct(L2f * uf, (8, 8)) == collect(interior(L2g * u))
@@ -170,7 +170,7 @@ struct NoTraitOp85 <: AbstractOperator end
         bf = BlockForest(
             CartesianGrid(((0.0, 1.0), (0.0, 1.0)), (8, 8)); blocksize=(4, 4), maxlevel=2
         )
-        uf = set!(scalar_field(bf), fun)
+        uf = set!(fun, scalar_field(bf))
         L2 = laplacian(bf) * laplacian(bf)
         A = prepare(L2, uf)
         v = flatten(uf)
@@ -186,7 +186,7 @@ struct NoTraitOp85 <: AbstractOperator end
         # rank-changing composition: the intermediate is a vector BlockField whose
         # inter-block exchange must reproduce the single-grid wide Laplacian exactly
         g8 = CartesianGrid(((0.0, 1.0), (0.0, 1.0)), (8, 8))
-        u8 = set!(scalar_field(g8), fun)
+        u8 = set!(fun, scalar_field(g8))
         wide = apply(divergence(g8), apply(MFO.gradient(g8), u8))
         DG = divergence(bf) * MFO.gradient(bf)
         @test reconstruct(DG * copy(uf), (8, 8)) == collect(interior(wide))
@@ -197,12 +197,12 @@ struct NoTraitOp85 <: AbstractOperator end
         for bc in bcs
             g = CartesianGrid(((0.0, 1.0), (0.0, 1.0)), (8, 8); bc=bc)
             bf = BlockForest(g; blocksize=(4, 4), maxlevel=2)
-            u = set!(scalar_field(g), fun)
-            uf = set!(scalar_field(bf), fun)
+            u = set!(fun, scalar_field(g))
+            uf = set!(fun, scalar_field(bf))
             @test reconstruct(MFO.gradient(bf) * uf, (8, 8)) ==
                 collect(interior(MFO.gradient(g) * u))
-            w = set!(vector_field(g), vfun)
-            wf = set!(vector_field(bf), vfun)
+            w = set!(vfun, vector_field(g))
+            wf = set!(vfun, vector_field(bf))
             @test reconstruct(divergence(bf) * wf, (8, 8)) ==
                 collect(interior(divergence(g) * w))
         end
@@ -261,8 +261,8 @@ struct NoTraitOp85 <: AbstractOperator end
         @testset "trait table" begin
             g = CartesianGrid(((0.0, 1.0), (0.0, 1.0)), (8, 8))
             bf = BlockForest(g; blocksize=(4, 4), maxlevel=2)
-            κ = set!(scalar_field(bf), x -> 1 + x[1])
-            vel = set!(vector_field(bf), x -> SVector(1.0, 0.5))
+            κ = set!(x -> 1 + x[1], scalar_field(bf))
+            vel = set!(x -> SVector(1.0, 0.5), vector_field(bf))
             for L in (
                 laplacian(bf), derivative(bf, 1; order=1), derivative(bf, 2; order=2),
                 MFO.gradient(bf), divergence(bf), scaling(κ), scaling(2.0), identity_op(),
@@ -317,7 +317,7 @@ struct NoTraitOp85 <: AbstractOperator end
                 balance!(bf)
                 @test !bf.forest.uniform[]
             end
-            u = set!(scalar_field(bf), f)
+            u = set!(f, scalar_field(bf))
             T = eltype(u)
             @test T === eltype(groot.spacing)
             N = length(bs)
@@ -352,7 +352,7 @@ struct NoTraitOp85 <: AbstractOperator end
                 @test count_exchanges!(ys, T(3) * aniso, x, bf) == (1, 1)
                 @test interiors_equal(ys, per_operand!(similar(x), T(3) * aniso, x, bf, true, false))
                 # a diagonal operand rides along on the shared exchange
-                κ = set!(scalar_field(bf), z -> 1 + z[1] * z[2])
+                κ = set!(z -> 1 + z[1] * z[2], scalar_field(bf))
                 κx = x isa PackedBlockField ? pack(κ) : κ
                 mixed = laplacian(bf) + scaling(κx)
                 ym = similar(x)
@@ -384,8 +384,8 @@ struct NoTraitOp85 <: AbstractOperator end
             κ_fun = z -> 1 + z[1] + 0.5 * z[2]^2      # variable κ: rewrite ≠ restriction
             # uniform: cfflux is empty, so the sum shares one exchange, bit-exactly
             bfu = BlockForest(g; blocksize=(4, 4), maxlevel=3)
-            u = set!(scalar_field(bfu), fun)
-            Du = diffusion(bfu, set!(scalar_field(bfu), κ_fun)) + laplacian(bfu)
+            u = set!(fun, scalar_field(bfu))
+            Du = diffusion(bfu, set!(κ_fun, scalar_field(bfu))) + laplacian(bfu)
             @test shares_exchange(Du)
             yu = similar(u)
             @test count_exchanges!(yu, Du, u, bfu) == (1, 1)
@@ -394,8 +394,8 @@ struct NoTraitOp85 <: AbstractOperator end
             bfr = BlockForest(g; blocksize=(4, 4), maxlevel=3)
             refine!(bfr, x -> x[1] < 0.5 && x[2] < 0.5)
             balance!(bfr)
-            ur = set!(scalar_field(bfr), fun)
-            Dr = diffusion(bfr, set!(scalar_field(bfr), κ_fun))
+            ur = set!(fun, scalar_field(bfr))
+            Dr = diffusion(bfr, set!(κ_fun, scalar_field(bfr)))
             Lr = Dr + laplacian(bfr)
             @test !shares_exchange(Lr)
             yr = similar(ur)

@@ -345,7 +345,7 @@ g = CartesianGrid(((0.0, 1.0), (0.0, 1.0)), (64, 64))
 L = -laplacian(g)
 A = prepare(L)
 M = MultigridPreconditioner(L)
-b = flatten(set!(scalar_field(g), x -> sinpi(x[1]) * sinpi(x[2])))
+b = flatten(set!(x -> sinpi(x[1]) * sinpi(x[2]), scalar_field(g)))
 u, stats = Krylov.cg(A, b; M)
 ```
 

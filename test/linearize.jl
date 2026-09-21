@@ -5,7 +5,7 @@
             bc=((Dirichlet(), Dirichlet()), (Neumann(), Neumann())),
         )
         rng = Random.MersenneTwister(41)
-        for F in (laplacian(g), advection(g, set!(vector_field(g), x -> SVector(x[1], 1.0))))
+        for F in (laplacian(g), advection(g, set!(x -> SVector(x[1], 1.0), vector_field(g))))
             u0 = scalar_field(g)
             v = scalar_field(g)
             interior(u0) .= rand(rng, local_size(g)...)
@@ -21,15 +21,15 @@
     @testset "self-advection JVP matches directional finite difference" begin
         g = CartesianGrid(((0.0, 2π),), (32,); bc=((Periodic(), Periodic()),))
         F = advection(g, SelfAdvection())
-        u0 = set!(vector_field(g), x -> SVector(sin(x[1])))
-        v = set!(vector_field(g), x -> SVector(cos(2 * x[1])))
+        u0 = set!(x -> SVector(sin(x[1])), vector_field(g))
+        v = set!(x -> SVector(cos(2 * x[1])), vector_field(g))
         J = linearize(F, u0)
         Jv = apply(J, copy(v))
 
         # analytic: ∂/∂ε (u+εv)·∇(u+εv)|₀ = v·∇u + u·∇v
         ref = set!(
-            vector_field(g),
             x -> SVector(cos(2 * x[1]) * cos(x[1]) - 2 * sin(x[1]) * sin(2 * x[1])),
+            vector_field(g),
         )
         @test maximum(norm.(collect(interior(Jv)) .- collect(interior(ref)))) < 0.05
 
@@ -45,9 +45,9 @@
     @testset "linearize! refresh equals fresh linearize" begin
         g = CartesianGrid(((0.0, 2π),), (16,); bc=((Periodic(), Periodic()),))
         F = advection(g, SelfAdvection())
-        u0 = set!(vector_field(g), x -> SVector(sin(x[1])))
-        u1 = set!(vector_field(g), x -> SVector(cos(x[1])))
-        v = set!(vector_field(g), x -> SVector(sin(2 * x[1])))
+        u0 = set!(x -> SVector(sin(x[1])), vector_field(g))
+        u1 = set!(x -> SVector(cos(x[1])), vector_field(g))
+        v = set!(x -> SVector(sin(2 * x[1])), vector_field(g))
 
         J = linearize(F, u0)
         linearize!(J, u1)
@@ -59,12 +59,12 @@
     @testset "prepared Jacobian drives Krylov (implicit-Euler JFNK system)" begin
         g = CartesianGrid(((0.0, 2π),), (24,); bc=((Periodic(), Periodic()),))
         F = advection(g, SelfAdvection())
-        u0 = set!(vector_field(g), x -> SVector(2 + sin(x[1]) / 4))
+        u0 = set!(x -> SVector(2 + sin(x[1]) / 4), vector_field(g))
         J = linearize(F, u0)
         @test_throws ArgumentError adjoint(J)
         @test size(J) == (24, 24)
 
-        v = set!(vector_field(g), x -> SVector(cos(x[1])))
+        v = set!(x -> SVector(cos(x[1])), vector_field(g))
         Pj = prepare(J, u0)
         jv = similar(flatten(v))
         mul!(jv, Pj, flatten(v))
@@ -88,7 +88,7 @@
             bc=((Dirichlet(), Dirichlet()), (Neumann(), Neumann())),
         )
         rng = Random.MersenneTwister(93)
-        vel = set!(vector_field(g), x -> SVector(x[1], 1.0))
+        vel = set!(x -> SVector(x[1], 1.0), vector_field(g))
 
         @testset "Jacobian of the linear $(name) is the operator, exactly" for (name, F) in
                                                                               (
@@ -116,7 +116,7 @@
         @testset "nonlinear self-advection: JVP vs FD, and the adjoint identity" begin
             g1 = CartesianGrid(((0.0, 2π),), (16,); bc=((Periodic(), Periodic()),))
             F = advection(g1, SelfAdvection())
-            u0 = set!(vector_field(g1), x -> SVector(2 + sin(x[1])))
+            u0 = set!(x -> SVector(2 + sin(x[1])), vector_field(g1))
             J = linearize(F, u0, EnzymeJVP())
 
             x = vector_field(g1)
@@ -149,9 +149,9 @@
         @testset "linearize! refresh, and the unloaded-backend error" begin
             g1 = CartesianGrid(((0.0, 2π),), (16,); bc=((Periodic(), Periodic()),))
             F = advection(g1, SelfAdvection())
-            u0 = set!(vector_field(g1), x -> SVector(sin(x[1])))
-            u1 = set!(vector_field(g1), x -> SVector(cos(x[1])))
-            v = set!(vector_field(g1), x -> SVector(sin(2 * x[1])))
+            u0 = set!(x -> SVector(sin(x[1])), vector_field(g1))
+            u1 = set!(x -> SVector(cos(x[1])), vector_field(g1))
+            v = set!(x -> SVector(sin(2 * x[1])), vector_field(g1))
             J = linearize(F, u0, EnzymeJVP())
             linearize!(J, u1)
             fresh = linearize(F, u1, EnzymeJVP())

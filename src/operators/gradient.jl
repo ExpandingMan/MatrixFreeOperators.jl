@@ -49,7 +49,7 @@ vector field — one of the two rank-changing leaves (with [`divergence`](@ref))
 ```julia
 g = CartesianGrid(((0.0, 2π), (0.0, 2π)), (32, 32);
                   bc=((Periodic(), Periodic()), (Periodic(), Periodic())))
-u = set!(scalar_field(g), x -> sin(x[1]) * sin(x[2]))
+u = set!(x -> sin(x[1]) * sin(x[2]), scalar_field(g))
 ∇u = gradient(g) * u             # SVector{2}-valued Field
 ```
 

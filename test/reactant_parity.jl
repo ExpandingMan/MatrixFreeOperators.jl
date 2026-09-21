@@ -10,7 +10,7 @@ Reactant.set_default_backend("cpu")
             bc=((Periodic(), Periodic()), (Dirichlet(), Neumann())),
         )
         P = prepare(laplacian(g), scalar_field(g))
-        x = flatten(set!(scalar_field(g), x -> sin(x[1]) * x[2]^2))
+        x = flatten(set!(x -> sin(x[1]) * x[2]^2, scalar_field(g)))
         y = zero(x)
         mul!(y, P, x)
 
@@ -25,7 +25,7 @@ Reactant.set_default_backend("cpu")
     @testset "prepared mul! parity (3D)" begin
         g = CartesianGrid(((0.0, 1.0), (0.0, 1.0), (0.0, 1.0)), (8, 9, 10))
         P = prepare(laplacian(g), scalar_field(g))
-        x = flatten(set!(scalar_field(g), x -> x[1]^2 + sinpi(x[2]) * x[3]))
+        x = flatten(set!(x -> x[1]^2 + sinpi(x[2]) * x[3], scalar_field(g)))
         y = zero(x)
         mul!(y, P, x)
 
@@ -40,8 +40,8 @@ Reactant.set_default_backend("cpu")
     @testset "apply! α/β accumulation parity" begin
         g = CartesianGrid(((0.0, 1.0), (0.0, 1.0)), (16, 16))
         L = laplacian(g)
-        u = set!(scalar_field(g), x -> sinpi(x[1]) * x[2])
-        w = set!(scalar_field(g), x -> x[1] + x[2])
+        u = set!(x -> sinpi(x[1]) * x[2], scalar_field(g))
+        w = set!(x -> x[1] + x[2], scalar_field(g))
         y = apply!(deepcopy(w), L, deepcopy(u), g, 2.0, 0.5)
 
         ur = Reactant.to_rarray(deepcopy(u))

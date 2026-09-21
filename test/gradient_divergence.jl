@@ -8,28 +8,28 @@ end
 @testset "Gradient and Divergence (rank-changers)" begin
     @testset "gradient analytic action" begin
         g = periodic_grid_2d(32)
-        u = set!(scalar_field(g), x -> sin(x[1]) * sin(x[2]))
+        u = set!(x -> sin(x[1]) * sin(x[2]), scalar_field(g))
         ∇u = MatrixFreeOperators.gradient(g) * u
         @test eltype(∇u) === SVector{2,Float64}
-        ref = set!(vector_field(g), x -> SVector(cos(x[1]) * sin(x[2]), sin(x[1]) * cos(x[2])))
+        ref = set!(x -> SVector(cos(x[1]) * sin(x[2]), sin(x[1]) * cos(x[2])), vector_field(g))
         @test maximum(norm.(collect(interior(∇u)) .- collect(interior(ref)))) < 0.01
     end
 
     @testset "divergence analytic action" begin
         g = periodic_grid_2d(32)
-        v = set!(vector_field(g), x -> SVector(sin(x[1]) * cos(x[2]), cos(x[1]) * sin(x[2])))
+        v = set!(x -> SVector(sin(x[1]) * cos(x[2]), cos(x[1]) * sin(x[2])), vector_field(g))
         divv = divergence(g) * v
         @test eltype(divv) === Float64
-        ref = set!(scalar_field(g), x -> 2 * cos(x[1]) * cos(x[2]))
+        ref = set!(x -> 2 * cos(x[1]) * cos(x[2]), scalar_field(g))
         @test maximum(abs, collect(interior(divv)) .- collect(interior(ref))) < 0.02
     end
 
     @testset "div ∘ grad agrees with laplacian (both vs analytic)" begin
         g = periodic_grid_2d(48)
-        u = set!(scalar_field(g), x -> sin(x[1]) * sin(x[2]))
+        u = set!(x -> sin(x[1]) * sin(x[2]), scalar_field(g))
         wide = apply(divergence(g), apply(MatrixFreeOperators.gradient(g), u))
         compact = laplacian(g) * u
-        ref = -2 .* collect(interior(set!(scalar_field(g), x -> sin(x[1]) * sin(x[2]))))
+        ref = -2 .* collect(interior(set!(x -> sin(x[1]) * sin(x[2]), scalar_field(g))))
         @test maximum(abs, collect(interior(wide)) .- ref) < 0.02
         @test maximum(abs, collect(interior(compact)) .- ref) < 0.02
     end

@@ -6,7 +6,7 @@
     bc = ((Dirichlet(), Dirichlet()), (Neumann(), Neumann()))
     g = CartesianGrid(((0.0, 1.0), (0.0, 1.0)), (16, 16); bc=bc)
     bf = BlockForest(g; blocksize=(4, 4), maxlevel=2)   # 16 leaves
-    uf = set!(scalar_field(bf), fun)
+    uf = set!(fun, scalar_field(bf))
 
     @testset "pack/unpack round trip is bit-exact" begin
         p = pack(uf)
@@ -23,7 +23,7 @@
             @test up.blocks[i] == uf.blocks[i]
         end
 
-        w = set!(vector_field(bf), vfun)                # SVector eltype packs too
+        w = set!(vfun, vector_field(bf))                # SVector eltype packs too
         pw = pack(w)
         @test eltype(pw) === SVector{2,Float64}
         for i in 1:MFO.nleaves(bf)
@@ -32,7 +32,7 @@
     end
 
     @testset "set! on packed matches pack ∘ set!" begin
-        p = set!(MFO._zero_all!(pack(scalar_field(bf))), fun)
+        p = set!(fun, MFO._zero_all!(pack(scalar_field(bf))))
         @test p.data == pack(uf).data
     end
 
@@ -74,7 +74,7 @@
         bf2 = BlockForest(
             CartesianGrid(((0.0, 1.0), (0.0, 1.0)), (8, 8)); blocksize=(4, 4), maxlevel=2
         )
-        u2 = set!(scalar_field(bf2), fun)
+        u2 = set!(fun, scalar_field(bf2))
         p2 = pack(u2)
         @test_throws ArgumentError regrid!(p2; refine=Returns(true))         # packed never regrids
         @test_throws ArgumentError regrid!(u2, p2; refine=Returns(true))     # nor mixed in varargs

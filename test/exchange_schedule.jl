@@ -272,7 +272,7 @@ end
         interior_t = (h[1] + 1):(h[1] + n[1])             # transverse-interior band 2:5
         for bc in (periodic, mixed)
             bf = make_bf(bc)
-            f = set!(scalar_field(bf), x -> sinpi(x[1]) * cospi(2x[2]) + 0.5x[1])
+            f = set!(x -> sinpi(x[1]) * cospi(2x[2]) + 0.5x[1], scalar_field(bf))
             halo_update!(f, bf)
             for (i, K) in enumerate(bf.forest.leaves), d in 1:2, s in (-1, 1)
                 nbr = MFO.face_neighbor(bf.forest, K, d, s)
@@ -356,7 +356,7 @@ end
             lhs ≈ rhs || @info "adjoint identity" N T lhs rhs
             # constant reproduction (to roundoff of the weighted sum) on every
             # fill-owned ghost cell
-            c = set!(scalar_field(bf), _ -> T(0.75))
+            c = set!(_ -> T(0.75), scalar_field(bf))
             halo_update!(c, bf)
             tol = 50 * eps(T)
             for (phase, fills) in (("interp", sched.interp), ("restrict", sched.restrict))
@@ -656,14 +656,14 @@ end
         @test s2 !== s1
         @test s2.generation == bf.forest.generation[]
         @test length(s2.copies) == count_faces(bf)      # 4× the leaves ⇒ more descriptors
-        f = set!(scalar_field(bf), x -> x[1] - 2x[2])   # fresh field exchanges on the new forest
+        f = set!(x -> x[1] - 2x[2], scalar_field(bf))   # fresh field exchanges on the new forest
         @test halo_update!(f, bf) === f
     end
 
     @testset "inference and zero-allocation" begin
         bf = make_bf(((Dirichlet(), Dirichlet()), (Neumann(), Neumann())))
         @inferred MFO._exchange_schedule(bf)
-        uf = set!(scalar_field(bf), x -> sinpi(x[1]) * x[2])
+        uf = set!(x -> sinpi(x[1]) * x[2], scalar_field(bf))
         @inferred apply_bc!(uf, bf)
         @inferred MFO.fold_bc!(uf, bf)
         function alloc_halo(f, g)

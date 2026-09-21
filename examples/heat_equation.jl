@@ -20,8 +20,8 @@ nsteps = nframes * steps_per_frame
 dt = (tspan[2] - tspan[1]) / nsteps
 # 20 Gaussian blobs at random centers; diameter ≈ 4σ drawn uniform in [0.1, 0.3]
 blobs = [(rand(), rand(), 0.2 * (0.5 + rand())) for _ in 1:20]
-u0 = set!(scalar_field(g), x ->
-    sum(exp(-((x[1] - cx)^2 + (x[2] - cy)^2) / (s^2 / 8)) for (cx, cy, s) in blobs))
+u0 = set!(x ->
+    sum(exp(-((x[1] - cx)^2 + (x[2] - cy)^2) / (s^2 / 8)) for (cx, cy, s) in blobs), scalar_field(g))
 interior(u0) ./= maximum(interior(u0))
 
 function step!(u, du, L, αdt)

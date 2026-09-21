@@ -171,8 +171,8 @@ different, block-by-block order), so any order-independent reduction matches:
 g  = CartesianGrid(((0.0, 1.0), (0.0, 1.0)), (8, 8))
 bf = BlockForest(g; blocksize = (4, 4), maxlevel = 3)   # level 0 ⇒ same 8×8
 
-u  = set!(scalar_field(g),  x -> sinpi(x[1]) * sinpi(x[2]))
-uf = set!(scalar_field(bf), x -> sinpi(x[1]) * sinpi(x[2]))
+u  = set!(x -> sinpi(x[1]) * sinpi(x[2]),  scalar_field(g))
+uf = set!(x -> sinpi(x[1]) * sinpi(x[2]), scalar_field(bf))
 
 norm(flatten(laplacian(g) * u)) ≈ norm(flatten(laplacian(bf) * uf))
 ```
@@ -188,7 +188,7 @@ conflicts), re-establishes 2:1 balance, and returns freshly allocated fields wit
 the data carried across:
 
 ```{julia}
-bump = set!(scalar_field(forest), x -> exp(-((x[1] - 0.5)^2 + (x[2] - 0.5)^2) / 0.01))
+bump = set!(x -> exp(-((x[1] - 0.5)^2 + (x[2] - 0.5)^2) / 0.01), scalar_field(forest))
 bump = regrid!(bump; refine = b -> maximum(abs, interior(b)) > 0.5)
 length(collect(leaves(forest)))                  # resolution now follows the bump
 ```

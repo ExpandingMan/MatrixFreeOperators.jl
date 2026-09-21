@@ -70,7 +70,7 @@
 
         # ScalingOp / IdentityOp leaves
         @test operator_diagonal(scaling(2.5)) == 2.5
-        κ = set!(scalar_field(g), x -> 1 + x[1]^2)
+        κ = set!(x -> 1 + x[1]^2, scalar_field(g))
         @test operator_diagonal(scaling(κ)) === κ
         @test operator_diagonal(identity_op()) === true
 
@@ -79,7 +79,7 @@
             ((0.0, 1.0),), (6,); bc=((Periodic(), Periodic()),)
         )
         @test operator_diagonal(3 * laplacian(gp)) ≈ 3 * operator_diagonal(laplacian(gp))
-        σ = set!(scalar_field(g), x -> x[1] + x[2])
+        σ = set!(x -> x[1] + x[2], scalar_field(g))
         M = scaling(σ) - laplacian(g)
         @test flatten(operator_diagonal(M)) ≈ diag(materialize(prepare(M)))
         @test operator_diagonal(scaling(2.0) * scaling(κ)) isa Field
@@ -97,7 +97,7 @@
         gf = CartesianGrid(((0.0, 1.0),), (8,))
         gc = coarsen(gf)
         P = prolongation(gc, gf)
-        u = set!(scalar_field(gc), x -> 2 * x[1] + 1)
+        u = set!(x -> 2 * x[1] + 1, scalar_field(gc))
         y = P * u
         uc = collect(interior(u))
         yf = collect(interior(y))
@@ -110,7 +110,7 @@
 
         # Neumann wall child mirrors: (3/4)u₁ + (1/4)u₁ = u₁; constants preserved
         gfn = CartesianGrid(((0.0, 1.0),), (8,); bc=((Neumann(), Neumann()),))
-        un = set!(scalar_field(coarsen(gfn)), x -> 3.5 + 0 * x[1])
+        un = set!(x -> 3.5 + 0 * x[1], scalar_field(coarsen(gfn)))
         @test all(collect(interior(prolongation(coarsen(gfn), gfn) * un)) .≈ 3.5)
 
         # P·1 = 1 under Periodic and Neumann, D ∈ 1:3
@@ -121,7 +121,7 @@
                 bc=ntuple(_ -> (bc, bc), D),
             )
             gcD = coarsen(gD)
-            ones_c = set!(scalar_field(gcD), _ -> 1.0)
+            ones_c = set!(_ -> 1.0, scalar_field(gcD))
             @test all(collect(interior(prolongation(gcD, gD) * ones_c)) .≈ 1.0)
         end
     end
@@ -147,7 +147,7 @@
                 ntuple(_ -> 8, D);
                 bc=ntuple(_ -> (bc, bc), D),
             )
-            ones_f = set!(scalar_field(gD), _ -> 1.0)
+            ones_f = set!(_ -> 1.0, scalar_field(gD))
             @test all(collect(interior(restriction(gD) * ones_f)) .≈ 1.0)
         end
     end
@@ -309,18 +309,18 @@
         g = CartesianGrid(((0.0, 1.0), (0.0, 1.0)), (64, 64))
         L = -1 * laplacian(g)
         A = prepare(L)
-        b = flatten(set!(scalar_field(g), x -> 2 * pi^2 * sinpi(x[1]) * sinpi(x[2])))
+        b = flatten(set!(x -> 2 * pi^2 * sinpi(x[1]) * sinpi(x[2]), scalar_field(g)))
         u, _ = Krylov.cg(A, b; M=MultigridPreconditioner(L), rtol=1e-10)
-        uex = flatten(set!(scalar_field(g), x -> sinpi(x[1]) * sinpi(x[2])))
+        uex = flatten(set!(x -> sinpi(x[1]) * sinpi(x[2]), scalar_field(g)))
         @test maximum(abs, u .- uex) < 1e-3
     end
 
     @testset "variable-coefficient SPD system" begin
         g = CartesianGrid(((0.0, 1.0), (0.0, 1.0)), (16, 16))
-        σ = set!(scalar_field(g), x -> 1 + x[1] * x[2])
+        σ = set!(x -> 1 + x[1] * x[2], scalar_field(g))
         L = scaling(σ) - laplacian(g)
         A = prepare(L)
-        f = flatten(set!(scalar_field(g), x -> sinpi(x[1]) * sinpi(x[2])))
+        f = flatten(set!(x -> sinpi(x[1]) * sinpi(x[2]), scalar_field(g)))
         u, stats = Krylov.cg(A, f; M=MultigridPreconditioner(L; levels=2), rtol=1e-10)
         r = similar(f)
         mul!(r, A, u)
@@ -333,13 +333,13 @@
     @testset "standalone MultigridSolver" begin
         g = CartesianGrid(((0.0, 1.0), (0.0, 1.0)), (64, 64))
         L = -1 * laplacian(g)
-        b = flatten(set!(scalar_field(g), x -> 2 * pi^2 * sinpi(x[1]) * sinpi(x[2])))
+        b = flatten(set!(x -> 2 * pi^2 * sinpi(x[1]) * sinpi(x[2]), scalar_field(g)))
         u = solve(MultigridSolver(L), b; rtol=1e-10)
         A = prepare(L)
         r = similar(b)
         mul!(r, A, u)
         @test norm(b .- r) <= 1e-10 * norm(b)
-        uex = flatten(set!(scalar_field(g), x -> sinpi(x[1]) * sinpi(x[2])))
+        uex = flatten(set!(x -> sinpi(x[1]) * sinpi(x[2]), scalar_field(g)))
         @test maximum(abs, u .- uex) < 1e-3
 
         # inhomogeneous Dirichlet folded through boundary_rhs: u = 1 on ∂Ω
@@ -349,11 +349,11 @@
             bc=ntuple(_ -> (Dirichlet(1.0), Dirichlet(1.0)), 2),
         )
         Li = -1 * laplacian(gi)
-        fi = flatten(set!(scalar_field(gi), x -> 2 * pi^2 * sinpi(x[1]) * sinpi(x[2])))
+        fi = flatten(set!(x -> 2 * pi^2 * sinpi(x[1]) * sinpi(x[2]), scalar_field(gi)))
         rhs = fi .- flatten(boundary_rhs(Li, gi))
         ui = solve(MultigridSolver(Li), rhs; rtol=1e-10)
         uexi = flatten(
-            set!(scalar_field(gi), x -> 1 + sinpi(x[1]) * sinpi(x[2]))
+            set!(x -> 1 + sinpi(x[1]) * sinpi(x[2]), scalar_field(gi))
         )
         @test maximum(abs, ui .- uexi) < 4e-3
     end

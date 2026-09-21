@@ -209,7 +209,7 @@ function dist_boundary_rhs(D, T=Float64)
     return b
 end
 
-# CPU twin of the extension's set!(::MultiDeviceVector, P, fun).
+# CPU twin of the extension's set!(fun, ::MultiDeviceVector, P).
 function dist_set(D, fun, T=Float64)
     MatrixFreeOperators._dist_set!(D.xs, fun, D.ctx)
     x = Vector{T}(undef, sum(length, D.owned))
@@ -293,10 +293,10 @@ end
         # global one bit for bit, so a distributed RHS is partition-independent.
         g = CartesianGrid(((0.3, 1.7), (-1.1, 2.9)), (5, 9))
         fun = x -> sin(3x[1]) * exp(-x[2]) + 0.25x[1] * x[2]
-        ref = set!(scalar_field(g), fun)
+        ref = set!(fun, scalar_field(g))
         for np in (2, 3)
             for lp in partition_grid(g, np)
-                loc = set!(scalar_field(lp), fun)
+                loc = set!(fun, scalar_field(lp))
                 @test collect(interior(loc)) ==
                     collect(view(interior(ref), lp.local_range...))
             end
@@ -751,7 +751,7 @@ end
         g = gridof((Dirichlet(), Neumann()))
         n = prod(local_size(g))
         x = rand(MersenneTwister(11), n)
-        κ = set!(scalar_field(g), coeff_fun)
+        κ = set!(coeff_fun, scalar_field(g))
         for L in (scaling(κ), laplacian(g) * scaling(κ), scaling(κ) * laplacian(g))
             D = dist_prepare(L, g, 2)
             clean = dist_mul(D, x)
@@ -772,7 +772,7 @@ end
             g = gridof(cut)
             n = prod(local_size(g))
             x = rand(rng, n)
-            κ = set!(scalar_field(g), coeff_fun)
+            κ = set!(coeff_fun, scalar_field(g))
             ops = (
                 scaling(κ),
                 laplacian(g) * scaling(κ),
@@ -793,7 +793,7 @@ end
         g = gridof((Dirichlet(), Neumann()))
         n = prod(local_size(g))
         x = rand(MersenneTwister(13), n)
-        κ = set!(scalar_field(g), coeff_fun)
+        κ = set!(coeff_fun, scalar_field(g))
         D = dist_prepare(laplacian(g) * scaling(κ), g, 2)
         good = dist_mul(D, x)
         @test good == flatten(apply(laplacian(g) * scaling(κ), _field(g, x)))
@@ -813,7 +813,7 @@ end
         for cut in cutbcs, np in (2, 3)
             g = gridof(cut)
             n = prod(local_size(g))
-            κ = set!(scalar_field(g), coeff_fun)
+            κ = set!(coeff_fun, scalar_field(g))
             x, y = rand(rng, n), rand(rng, n)
             for L in (
                 scaling(κ) * laplacian(g),
@@ -870,7 +870,7 @@ end
     @testset "boundary_rhs parity" begin
         for cut in inhom_cuts, np in (1, 2, 3)
             g = inhom_grid(cut)
-            κ = set!(scalar_field(g), coeff_fun)
+            κ = set!(coeff_fun, scalar_field(g))
             D1 = derivative(g, 1)
             ops = (
                 laplacian(g),
@@ -962,11 +962,11 @@ end
     @testset "a full inhomogeneous RHS assembles slab-locally" begin
         for cut in inhom_cuts, np in (2, 3)
             g = inhom_grid(cut, (8, 12))
-            κ = set!(scalar_field(g), coeff_fun)
+            κ = set!(coeff_fun, scalar_field(g))
             fun = x -> sin(3x[1]) * exp(-x[2]) + 0.25x[1] * x[2]
             for L in (laplacian(g), scaling(κ) * laplacian(g))
                 D = dist_prepare(L, g, np)
-                ref = flatten(set!(scalar_field(g), fun)) .- flatten(boundary_rhs(L, g))
+                ref = flatten(set!(fun, scalar_field(g))) .- flatten(boundary_rhs(L, g))
                 @test dist_set(D, fun) .- dist_boundary_rhs(D) == ref
             end
         end
@@ -1002,7 +1002,7 @@ end
         for (ext, sz) in diff_exts, cut in ((Dirichlet(), Neumann()), (Periodic(), Periodic()))
             g = diff_grid(ext, sz, cut)
             N = length(sz)
-            plain = set!(scalar_field(g), diff_coeff_fun)
+            plain = set!(diff_coeff_fun, scalar_field(g))
             extended = diffusion(g, plain).κ
             for (κ, ghosts_read) in ((plain, false), (extended, true)), np in (1, 2, 3)
                 parts = partition_grid(g, np)
@@ -1043,7 +1043,7 @@ end
 
             g = diff_grid(ext, sz, cut)
             n = prod(local_size(g))
-            κ = set!(scalar_field(g), diff_coeff_fun)
+            κ = set!(diff_coeff_fun, scalar_field(g))
             Dop = diffusion(g, κ; averaging=avg)
             x, y = rand(rng, n), rand(rng, n)
             # `laplacian(g) + Dop` puts the leaf SECOND under the Added, so the slab
@@ -1081,7 +1081,7 @@ end
             g = diff_grid(ext, sz, cut)
             n = prod(local_size(g))
             x = rand(MersenneTwister(23), n)
-            κ = set!(scalar_field(g), diff_coeff_fun)
+            κ = set!(diff_coeff_fun, scalar_field(g))
             for L in (diffusion(g, κ), laplacian(g) * diffusion(g, κ))
                 D = dist_prepare(L, g, 2)
                 clean = dist_mul(D, x)
@@ -1107,7 +1107,7 @@ end
     # therefore be bit-for-bit the Laplacian's — same gating rule, same nodes.
     @testset "Diffusion adds no per-apply exchange" begin
         g = gridof((Dirichlet(), Neumann()))
-        κ = set!(scalar_field(g), diff_coeff_fun)
+        κ = set!(diff_coeff_fun, scalar_field(g))
         Dop = diffusion(g, κ)
         # A bare stencil leaf: no mid-tree node exists to hold an exchange.
         @test dist_prepare(Dop, g, 2).tree isa MatrixFreeOperators.DistLeaf
@@ -1142,10 +1142,10 @@ end
         for mk in (
             g -> laplacian(g) * laplacian(g),
             # A localized leaf dispatches dynamically; that must stay O(1), not O(cells).
-            g -> laplacian(g) * scaling(set!(scalar_field(g), coeff_fun)),
+            g -> laplacian(g) * scaling(set!(coeff_fun, scalar_field(g))),
             # ...including the one whose localization copies a padded coefficient:
             # that copy belongs to prepare, and must not reappear per apply.
-            g -> laplacian(g) * diffusion(g, set!(scalar_field(g), diff_coeff_fun)),
+            g -> laplacian(g) * diffusion(g, set!(diff_coeff_fun, scalar_field(g))),
         )
             small, large = steady((16, 16), mk, dist_mul!), steady((32, 32), mk, dist_mul!)
             @test large < 2 * small
@@ -1165,9 +1165,9 @@ end
             # ...and the slab diffusion leaf, whose adjoint is the interior stencil
             # plus the ghost-plane gather over a padded κ (issue #77) rather than the
             # self-adjoint shortcut.
-            g -> diffusion(g, set!(scalar_field(g), diff_coeff_fun)) + laplacian(g),
+            g -> diffusion(g, set!(diff_coeff_fun, scalar_field(g))) + laplacian(g),
             # ...in both Added slots: as `node.b` the leaf accumulates with β = true.
-            g -> laplacian(g) + diffusion(g, set!(scalar_field(g), diff_coeff_fun)),
+            g -> laplacian(g) + diffusion(g, set!(diff_coeff_fun, scalar_field(g))),
         )
             small = steady((16, 16), mk, dist_adjoint!)
             large = steady((32, 32), mk, dist_adjoint!)
@@ -1200,7 +1200,7 @@ end
 
             # slice 2b: a real coefficient field on an undistributed CartesianGrid
             # is sliceable onto the slabs, so it joins the whitelist.
-            κ = set!(scalar_field(g), x -> 1 + x[1])
+            κ = set!(x -> 1 + x[1], scalar_field(g))
             @test distributable(scaling(κ))
             @test distributable(scaling(κ) + laplacian(g))
             @test distributable(laplacian(g) * scaling(κ))
@@ -1210,7 +1210,7 @@ end
             # terms. Its face averaging reads κ across the cut, which
             # `_slab_field`'s padded window supplies at localization time — no exchange, so
             # nothing further to require of it here.
-            κp = set!(scalar_field(g), x -> 1 + x[1] + x[2])
+            κp = set!(x -> 1 + x[1] + x[2], scalar_field(g))
             for avg in (ArithmeticMean(), HarmonicMean())
                 @test distributable(diffusion(g, κp; averaging=avg))
             end
@@ -1220,7 +1220,7 @@ end
         end
 
         @testset "rejected: field-valued parameters" begin
-            v = set!(vector_field(g), x -> SVector(1.0, 0.0))
+            v = set!(x -> SVector(1.0, 0.0), vector_field(g))
             @test !distributable(advection(g, v))
             # the message must name the reason, not just the type
             err = try
@@ -1271,11 +1271,11 @@ end
             @test all(p -> !same(p, g), partition_grid(g, 2))
             @test same(Adapt.adapt(Array, g), g)
 
-            κg = set!(scalar_field(g), x -> 1 + x[1])
+            κg = set!(x -> 1 + x[1], scalar_field(g))
             @test check1(laplacian(g) + scaling(κg), g) isa MatrixFreeOperators.Added
             @test check1(laplacian(g) + scaling(κg), g2) isa MatrixFreeOperators.Added
 
-            κc = set!(scalar_field(gc), x -> 1 + x[1])
+            κc = set!(x -> 1 + x[1], scalar_field(gc))
             @test distributable(laplacian(g) + scaling(κc))        # each leaf is fine alone
             err = try
                 check1(laplacian(g) + scaling(κc), g)
@@ -1308,7 +1308,7 @@ end
             # face coefficient, no error), or a `BoundsError` on a smaller one.
             for szκ in ((12, 10), (4, 6))
                 gκ = CartesianGrid(((0.0, 1.0), (0.0, 1.0)), szκ)
-                κκ = set!(scalar_field(gκ), x -> 1 + x[1])
+                κκ = set!(x -> 1 + x[1], scalar_field(gκ))
                 Dbad = MatrixFreeOperators.Diffusion(g, κκ, ArithmeticMean())
                 @test distributable(Dbad)          # the leaf alone cannot tell
                 for L in (Dbad, laplacian(g) + Dbad)
@@ -1359,7 +1359,7 @@ end
 
         # The error points at the offending node, not merely at the tree root.
         @testset "message names the culprit inside a tree" begin
-            v = set!(vector_field(g), x -> SVector(1.0, 0.0))
+            v = set!(x -> SVector(1.0, 0.0), vector_field(g))
             err = try
                 check(laplacian(g) + 2.0 * advection(g, v))
             catch e

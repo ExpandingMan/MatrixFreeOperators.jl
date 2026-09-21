@@ -114,10 +114,10 @@
             refined && refine!(bf, x -> x[1] < 0.5)
             sched = MFO._exchange_schedule(bf)
             ds = MFO._flatten_schedule(sched, bf, cpu)
-            xr = pack(set!(scalar_field(bf), fun))
+            xr = pack(set!(fun, scalar_field(bf)))
             MFO._run_exchange_host!(xr, sched)
             MFO._run_bc_host!(xr, bf, sched)
-            xk = run_device!(pack(set!(scalar_field(bf), fun)), bf, ds)
+            xk = run_device!(pack(set!(fun, scalar_field(bf))), bf, ds)
             @test noncorner_parity(xk, xr)
             # operator action reads no corners ⇒ exact equality through the sweep
             L = laplacian(bf)
@@ -128,10 +128,10 @@
                 1:MFO.nleaves(bf),
             )
             # SVector fields ride the same descriptors
-            wr = pack(set!(vector_field(bf), vfun))
+            wr = pack(set!(vfun, vector_field(bf)))
             MFO._run_exchange_host!(wr, sched)
             MFO._run_bc_host!(wr, bf, sched)
-            wk = run_device!(pack(set!(vector_field(bf), vfun)), bf, ds)
+            wk = run_device!(pack(set!(vfun, vector_field(bf))), bf, ds)
             @test noncorner_parity(wk, wr)
         end
     end
@@ -145,7 +145,7 @@
         refine!(bf, x -> x[2] < 0.5)
         dims = (bf.blocksize..., MFO.nleaves(bf))
         for mk in (scalar_field, vector_field)
-            f = pack(set!(mk(bf), mk === scalar_field ? fun : vfun))
+            f = pack(set!(mk === scalar_field ? fun : vfun, mk(bf)))
             # gather (interior_to_flat!): broadcast body vs loops, α/β combos
             vref = flatten(f)
             for (α, β) in ((1.0, 0.0), (2.0, 0.5))
@@ -199,7 +199,7 @@
             refine!(bfn, x -> x[1] < 0.5)
             sched = MFO._exchange_schedule(bfn)
             ds = MFO._flatten_schedule(sched, bfn, cpu)
-            x = pack(set!(scalar_field(bfn), fun))
+            x = pack(set!(fun, scalar_field(bfn)))
             a, s = alloc_device(x, bfn, ds)
             @test isfinite(s)
             (a, MFO.nleaves(bfn))

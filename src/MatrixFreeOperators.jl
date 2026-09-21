@@ -6,15 +6,16 @@ using StaticArrays: SVector
 import KernelAbstractions
 using KernelAbstractions: @Const, @index, @kernel
 
-export AbstractGrid, CartesianGrid
+export AbstractGrid, CartesianGrid, getgrid
 export dimension, spacing, local_size, halo_width, boundary_conditions
-export interior, padded_size, cell_center, coarsen, halo_update!, partition_grid
+export interior, isinterior, padded_size, cell_center, coarsen, halo_update!, partition_grid
 export AbstractBC, Periodic, Dirichlet, Neumann, apply_bc!, fold_bc!
 export BlockForest, BlockField, PackedBlockField, pack, unpack
 export refine!, coarsen!, balance!, leaves, regrid!
 export Interpolated, Conservative, SlopeLimited, with_transfer
 export AbstractField, Field, Center, scalar_field, vector_field, set!, ncomponents, component
 export flatten, flat_to_interior!, interior_to_flat!
+export op!, compatible, check_compatible, check_layout, same_layout
 export AbstractOperator, apply, apply!, apply_adjoint!, AdjointOp
 export islinear, isconstant, isselfadjoint, isdiagonal, shares_exchange, operator_diagonal
 export Laplacian, laplacian, laplacian_stencil, laplacian_7pt_noflux

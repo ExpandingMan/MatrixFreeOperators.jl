@@ -1,7 +1,7 @@
 @testset "Operator algebra" begin
     g = periodic_grid_2d(24)
-    u = set!(scalar_field(g), x -> sin(x[1]) * sin(x[2]))
-    v = set!(vector_field(g), x -> SVector(sin(x[2]), cos(x[1])))
+    u = set!(x -> sin(x[1]) * sin(x[2]), scalar_field(g))
+    v = set!(x -> SVector(sin(x[2]), cos(x[1])), vector_field(g))
     A = laplacian(g)
     B = advection(g, v)
     ints(f) = collect(interior(f))
@@ -55,15 +55,15 @@
     @testset "variable-coefficient diffusion ∇·(κ∇u) stress test" begin
         function vc_error(n)
             gn = periodic_grid_2d(n)
-            κ = set!(scalar_field(gn), x -> 2 + cos(x[1]))
-            un = set!(scalar_field(gn), x -> sin(x[1]) * sin(x[2]))
+            κ = set!(x -> 2 + cos(x[1]), scalar_field(gn))
+            un = set!(x -> sin(x[1]) * sin(x[2]), scalar_field(gn))
             K = divergence(gn) * scaling(κ) * MatrixFreeOperators.gradient(gn)
             y = K * un
             ref = set!(
-                scalar_field(gn),
                 x ->
                     -2 * (2 + cos(x[1])) * sin(x[1]) * sin(x[2]) -
                     sin(x[1]) * cos(x[1]) * sin(x[2]),
+                scalar_field(gn),
             )
             return maximum(abs, collect(interior(y)) .- collect(interior(ref)))
         end
@@ -75,7 +75,7 @@
             ((0.0, 1.0), (0.0, 1.0)), (4, 3);
             bc=((Dirichlet(), Dirichlet()), (Neumann(), Neumann())),
         )
-        κ = set!(scalar_field(gn), x -> 1 + x[1] * x[2])
+        κ = set!(x -> 1 + x[1] * x[2], scalar_field(gn))
         K = divergence(gn) * scaling(κ) * MatrixFreeOperators.gradient(gn)
         M = materialize(prepare(K, scalar_field(gn)))
         Mt = materialize(prepare(adjoint(K), scalar_field(gn)))
@@ -87,7 +87,7 @@
             ((0.0, 1.0), (0.0, 1.0)), (4, 4);
             bc=((Periodic(), Periodic()), (Dirichlet(), Neumann())),
         )
-        vn = set!(vector_field(gn), x -> SVector(1 + x[1], x[2] - 2))
+        vn = set!(x -> SVector(1 + x[1], x[2] - 2), vector_field(gn))
         Adv = advection(gn, vn)
         M = materialize(prepare(Adv, scalar_field(gn)))
         Mt = materialize(prepare(adjoint(Adv), scalar_field(gn)))

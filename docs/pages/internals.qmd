@@ -1084,7 +1084,7 @@ g = CartesianGrid(((0.0, 1.0), (0.0, 1.0)), (256, 256))  # homogeneous Dirichlet
 L = -laplacian(g)
 P = prepare(L)
 M = MultigridPreconditioner(L)
-b = flatten(set!(scalar_field(g), x -> 2π^2 * sinpi(x[1]) * sinpi(x[2])))
+b = flatten(set!(x -> 2π^2 * sinpi(x[1]) * sinpi(x[2]), scalar_field(g)))
 u, stats = Krylov.cg(P, b; M)
 ```
 

@@ -50,7 +50,7 @@ nonlinear — see [`linearize`](@ref) for its Jacobian.
 ```julia
 g = CartesianGrid(((0.0, 2π), (0.0, 2π)), (32, 32);
                   bc=((Periodic(), Periodic()), (Periodic(), Periodic())))
-v = set!(vector_field(g), x -> SVector(1.0, 0.0))
+v = set!(x -> SVector(1.0, 0.0), vector_field(g))
 A = advection(g, v)                  # linear: passive transport by v
 B = advection(g, SelfAdvection())    # nonlinear: u·∇u
 ```

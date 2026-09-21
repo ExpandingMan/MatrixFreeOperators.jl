@@ -45,7 +45,7 @@ function diffusion_loss(κdata, udata, w, gg)
 end
 
 rng = MersenneTwister(1)
-u = set!(scalar_field(g), x -> sinpi(x[1]) * sinpi(x[2]))
+u = set!(x -> sinpi(x[1]) * sinpi(x[2]), scalar_field(g))
 w = rand(rng, local_size(g)...)
 κ = 1.0 .+ rand(rng, padded_size(g)...)
 
@@ -156,12 +156,12 @@ using Enzyme, StaticArrays, LinearAlgebra
 
 g1 = CartesianGrid(((0.0, 2π),), (32,); bc=((Periodic(), Periodic()),))
 F  = advection(g1, SelfAdvection())          # nonlinear u·∇u
-u0 = set!(vector_field(g1), x -> SVector(2 + sin(x[1])))
+u0 = set!(x -> SVector(2 + sin(x[1])), vector_field(g1))
 
 J  = linearize(F, u0)                        # FiniteDifferenceJVP — the default
 Ja = linearize(F, u0, EnzymeJVP())           # exact, and has a transpose
 
-v = set!(vector_field(g1), x -> SVector(cos(2x[1])))
+v = set!(x -> SVector(cos(2x[1])), vector_field(g1))
 Jv  = collect(interior(apply(J,  copy(v))))
 Jav = collect(interior(apply(Ja, copy(v))))
 
@@ -174,7 +174,7 @@ Only the Enzyme-backed one has a transpose:
 # A ramp rather than a trig mode: on this periodic grid J·v is orthogonal to the
 # low harmonics, so a sin/cos test vector would make both sides vanish and the
 # identity would hold vacuously.
-w = set!(vector_field(g1), x -> SVector(x[1] / 2π))
+w = set!(x -> SVector(x[1] / 2π), vector_field(g1))
 lhs = sum(dot.(collect(interior(apply(Ja, copy(v)))), collect(interior(w))))
 rhs = sum(dot.(collect(interior(v)), collect(interior(apply(adjoint(Ja), copy(w))))))
 (lhs, rhs, abs(lhs - rhs))                   # ⟨Jv, w⟩ = ⟨v, Jᵀw⟩

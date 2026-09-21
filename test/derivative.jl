@@ -1,8 +1,8 @@
 function deriv_periodic_error(n::Int, order::Int)
     g = CartesianGrid(((0.0, 2π),), (n,); bc=((Periodic(), Periodic()),))
-    u = set!(scalar_field(g), x -> sin(x[1]))
+    u = set!(x -> sin(x[1]), scalar_field(g))
     y = derivative(g, 1; order) * u
-    ref = set!(scalar_field(g), order == 1 ? (x -> cos(x[1])) : (x -> -sin(x[1])))
+    ref = set!(order == 1 ? (x -> cos(x[1])) : (x -> -sin(x[1])), scalar_field(g))
     return maximum(abs, collect(interior(y)) .- collect(interior(ref)))
 end
 
@@ -25,9 +25,9 @@ end
             ((0.0, 2π), (0.0, 2π)), (32, 32);
             bc=((Periodic(), Periodic()), (Periodic(), Periodic())),
         )
-        u = set!(scalar_field(g), x -> sin(x[2]))
+        u = set!(x -> sin(x[2]), scalar_field(g))
         dy = derivative(g, 2) * u
-        ref = set!(scalar_field(g), x -> cos(x[2]))
+        ref = set!(x -> cos(x[2]), scalar_field(g))
         @test maximum(abs, collect(interior(dy)) .- collect(interior(ref))) < 0.01
         dx = derivative(g, 1) * u
         @test maximum(abs, collect(interior(dx))) < 1e-12

@@ -403,8 +403,8 @@ function simulate(; adaptive::Bool)
         balance!(bf)
     end
 
-    V = set!(scalar_field(bf), _ -> initial_voltage())
-    S = set!(state_field(bf), _ -> initial_state())
+    V = set!(_ -> initial_voltage(), scalar_field(bf))
+    S = set!(_ -> initial_state(), state_field(bf))
     LV = scalar_field(bf)
     Lop = diffusion_operator(bf)
 
@@ -419,8 +419,8 @@ function simulate(; adaptive::Bool)
     diffuse!(V, LV, Lop, bf)
     react!(V, S, bf, 0.0)
     probe_all(V, bf, probes)
-    V = set!(scalar_field(bf), _ -> initial_voltage())
-    S = set!(state_field(bf), _ -> initial_state())
+    V = set!(_ -> initial_voltage(), scalar_field(bf))
+    S = set!(_ -> initial_state(), state_field(bf))
     LV = scalar_field(bf)
 
     snaps, hist = Any[], Tuple{Float64,Int}[]

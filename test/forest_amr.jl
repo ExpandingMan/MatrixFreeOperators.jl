@@ -44,7 +44,7 @@
             bf = BlockForest(base; blocksize=(4, 4), maxlevel=2)
             refine!(bf, predicate)
             @test !bf.forest.uniform[]
-            u = set!(scalar_field(bf), quad)
+            u = set!(quad, scalar_field(bf))
             halo_update!(u, bf)
             nchecked = 0
             foreach_cf_ghost(u, bf) do val, center
@@ -65,7 +65,7 @@
         refine!(bf, x -> x[1] < 0.2 && x[2] < 0.2)   # levels 0–2, balance! keeps 2:1
         @test minimum(k -> k.level, bf.forest.leaves) == 0
         @test maximum(k -> k.level, bf.forest.leaves) == 2
-        u = set!(scalar_field(bf), quad)
+        u = set!(quad, scalar_field(bf))
         halo_update!(u, bf)
         foreach_cf_ghost(u, bf) do val, center
             @test val ≈ quad(center) atol = 1e-12
@@ -87,7 +87,7 @@
             # resolutions): CF interface at x = π/2 and a wrapped one at x = 0
             refine!(bf, x -> x[1] < 1.6)
             @test !bf.forest.uniform[]
-            u = set!(scalar_field(bf), x -> sin(x[1]) * sin(x[2]))
+            u = set!(x -> sin(x[1]) * sin(x[2]), scalar_field(bf))
             Lu = laplacian(bf) * u
             e = 0.0
             for i in 1:MFO.nleaves(bf)
@@ -270,6 +270,6 @@
         @test_throws ArgumentError halo_update!(u2, bf2)
         # uniform forests keep the looser v1 constraints
         bf2u = BlockForest(base4; blocksize=(2, 2), maxlevel=2)
-        @test laplacian(bf2u) * set!(scalar_field(bf2u), x -> x[1]) isa BlockField
+        @test laplacian(bf2u) * set!(x -> x[1], scalar_field(bf2u)) isa BlockField
     end
 end

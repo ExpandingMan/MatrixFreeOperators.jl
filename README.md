@@ -101,13 +101,13 @@ g = CartesianGrid(((0.0, 1.0), (0.0, 1.0)), (32, 32))
 
 # σ(x,y) = 1 + xy as a coefficient field. Fields are device arrays plus
 # grid metadata; set! fills them from a function of position.
-σ = set!(scalar_field(g), x -> 1 + x[1] * x[2])
+σ = set!(x -> 1 + x[1] * x[2], scalar_field(g))
 
 # The operator is composed symbolically — no matrix is ever assembled.
 K = scaling(σ) - laplacian(g)
 
 # Manufactured right-hand side for u = sin(πx)sin(πy).
-f = set!(scalar_field(g), x -> (2π^2 + 1 + x[1] * x[2]) * sinpi(x[1]) * sinpi(x[2]))
+f = set!(x -> (2π^2 + 1 + x[1] * x[2]) * sinpi(x[1]) * sinpi(x[2]), scalar_field(g))
 
 # prepare walks the operator tree once and allocates all scratch buffers;
 # the result supports mul!/size/eltype with zero steady-state allocations,
@@ -116,7 +116,7 @@ P = prepare(K, scalar_field(g))
 u, stats = cg(P, flatten(f))
 
 # Compare against the exact solution on the interior DOFs.
-u_exact = flatten(set!(scalar_field(g), x -> sinpi(x[1]) * sinpi(x[2])))
+u_exact = flatten(set!(x -> sinpi(x[1]) * sinpi(x[2]), scalar_field(g)))
 maximum(abs, u .- u_exact)   # ~1e-3, second-order accurate
 ```
 
