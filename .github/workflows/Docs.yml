@@ -18,6 +18,9 @@ concurrency:
 jobs:
   docs:
     runs-on: ubuntu-latest
+    # A good build runs the suite under coverage (~20–35 min). Without a cap a hang
+    # burns GitHub's 6 h limit and stalls every Docs run queued behind it in `pages`.
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v7
 
